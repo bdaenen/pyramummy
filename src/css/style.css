@@ -1,0 +1,109 @@
+* {
+  margin: 0;
+  padding: 0;
+  color: #AAA;
+  user-select: none;
+  overflow: hidden;
+  cursor: none;
+}
+html {
+  height: 100%;
+  background: #383838;
+  font-family: sans-serif;
+}
+body {
+  position: relative;
+}
+.col {
+  width: 33%;
+  display: inline-block;
+}
+.r {
+  background: #B00;
+}
+.g {
+  background: #0B0;
+}
+.b {
+  background: #00B;
+}
+ul,
+li {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.c {
+  position: relative;
+  margin: 0 auto;
+  width: 100vw;
+  height: 100vh;
+}
+.c canvas {
+  cursor: none;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+button {
+  border: 1px solid #AAA;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  font-size: 20px;
+  margin-top: 10px;
+  padding: 10px 20px;
+  transition: all 300ms;
+}
+button:hover {
+  border-color: #FFF;
+  color: #FFF;
+  cursor: pointer;
+}
+button + button {
+  margin-left: 15px;
+}
+button.small {
+  margin-left: 30px;
+  padding: 10px;
+  font-size: 12px;
+}
+.effect {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  opacity: 1;
+  transform: translateX(-50%);
+  transition: all 300ms ease-in, opacity 300ms ease-in-out;
+}
+.effect.fade {
+  opacity: 0;
+}
+.hidden {
+  display: none;
+}
+.floor {
+  z-index: -1;
+  position: absolute;
+  width: 100vw;
+  height: 100vh;
+}
+.scanLines {
+  pointer-events: none;
+  position: relative;
+  filter: blur(0.6px);
+}
+.scanLines * {
+  pointer-events: all;
+}
+.scanLines:after {
+  pointer-events: none;
+  background: -webkit-repeating-linear-gradient(top, transparent 0px, transparent 2px, rgba(255, 255, 255, 0.25) 2px, rgba(0, 0, 0, 0.25) 4px);
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 999999;
+}

@@ -1,0 +1,34 @@
+<!doctype html>
+<meta charset="utf-8" />
+
+<link rel="stylesheet" type="text/css" inline href="css/style.css"/>
+
+<div class="c">
+</div>
+<img id="img_shot" src="assets/shot.png" width="5" height="5" style="position: absolute; opacity: 0;"/>
+<img id="img_shot2" src="assets/shot2.png" width="5" height="4" style="position: absolute; opacity: 0;"/>
+<!--<img id="img_player" src="assets/igor2.png" width="8" height="20" style="position: absolute; opacity: 0;"/>-->
+<img id="img_player" src="assets/igor3.png" width="8" height="21" style="position: absolute; opacity: 0;"/>
+<img id="img_wall_hard" src="assets/wall2.png" width="10" height="20" style="position: absolute; opacity: 0;"/>
+<img id="img_wall" src="assets/wall3.png" width="10" height="20" style="position: absolute; opacity: 0;"/>
+<img id="img_bg" src="assets/wall_bg.png" width="10" height="20" style="position: absolute; opacity: 0;"/>
+<img id="img_button_click" src="assets/click.png" width="69" height="274" style="position: absolute; opacity: 0;"/>
+<img id="img_button_rightclick" src="assets/rightclick.png" width="69" height="274" style="position: absolute; opacity: 0;"/>
+<script>
+  var d=document,w=window;w.$ = d.querySelector.bind(d);
+  w.$$ = d.querySelectorAll.bind(d);
+  w.find = function(parent, searchTerm){
+    return parent.querySelectorAll(searchTerm)
+  };
+  w.rnd=function(min, max){
+    return Math.floor(Math.random()*(max-min+1)+min);
+  };
+  w.CIRCLE = Math.PI * 2;
+</script>
+<script inline src="js/kontra.js"></script>
+<script inline src="js/jsfxr.js"></script>
+<script inline src="js/lvl2_0.js"></script>
+<script inline src="js/lvl2_1.js"></script>
+<script inline src="js/lvl3_0.js"></script>
+<script inline src="js/lvl3_1.js"></script>
+<script inline src="js/main.js"></script>
