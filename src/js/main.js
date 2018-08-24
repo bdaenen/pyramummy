@@ -1,13 +1,14 @@
 (function() {
     'use strict';
+    var DEBUG = true;
     var canvas = d.createElement('canvas');
     var bgCanvas = d.createElement('canvas');
     var bgCtx = bgCanvas.getContext('2d');
     var ctx = canvas.getContext('2d');
     ctx.imageSmoothingEnabled = false;
     var currentLevel = null;
-    var jumpCooldown = 0.1;
-    var timeSinceJump = 0.1;
+    var jumpCooldown = 0.2;
+    var timeSinceJump = 0.2;
     var bgPattern = null;
     var playerAnimationTimerValue = 100;
     var playerAnimationTimer = playerAnimationTimerValue;
@@ -24,9 +25,9 @@
         bgCtx.fill();
     };
     var worldCoord = {
-        _x: 2,
+        _x: 4,
         _y: 0,
-        prevX: 2,
+        prevX: 4,
         prevY: 0,
         get x() {
             return this._x;
@@ -137,8 +138,9 @@
         properties: {
             mirror: false,
             grounded: false,
-            canLink: false,
-            canPush: false
+            canLink: DEBUG,
+            canPush: DEBUG,
+            canSprint: DEBUG
         },
         render: function(){
             var deltaY = 0;
@@ -159,7 +161,7 @@
             else {
                 this.context.scale(1, 1);
             }
-            this.context.drawImage(this.image, this.properties.mirror ? -8: 0, deltaY);
+            this.context.drawImage(this.image, this.properties.mirror ? -7: 0, deltaY);
             this.context.restore();
         }
     });
@@ -224,7 +226,6 @@
 
     var loop = kontra.gameLoop({
         update: function(dt) {
-
             updatePlayer(dt);
             updateCrosshair(dt);
             updateBullets(dt);
@@ -284,12 +285,23 @@
         if (kontra.keys.pressed('left') || kontra.keys.pressed('q') || kontra.keys.pressed('a')) {
             playerAnimationTimer -= dt*1000;
             player.properties.mirror = true;
-            player.x -= 1;
+            if (player.properties.canSprint && kontra.keys.pressed('shift')) {
+                player.x -= 2;
+            }
+            else {
+                player.x -= 1;
+            }
         }
         else if (kontra.keys.pressed('right') || kontra.keys.pressed('d')) {
             playerAnimationTimer -= dt*1000;
             player.properties.mirror = false;
-            player.x += 1;
+
+            if (player.properties.canSprint && kontra.keys.pressed('shift')) {
+                player.x += 2;
+            }
+            else {
+                player.x += 1;
+            }
         }
 
         updateGrounded(player);
@@ -385,6 +397,9 @@
 
         for (var i = 0; i < tilePool.size; i++) {
             levelSprite = tilePool.objects[i];
+            if (!levelSprite.ttl) {
+                continue;
+            }
             if (levelSprite.y > currentLevel.height*tileHeight || levelSprite.x < -tileWidth || levelSprite.x > (currentLevel.width*tileWidth) || levelSprite.y < -tileHeight && levelSprite.ttl > 0) {
                 if (levelSprite.properties.marked) {
                     unlinkMarkedSprites();
@@ -411,7 +426,7 @@
                     }
                 }
                 else if (bullet.properties.type === 2) {
-                    if(levelSprite.properties.movable) {
+                    if (levelSprite.properties.movable) {
                         levelSprite.dx = bullet.dx;
                         levelSprite.dy = bullet.dy;
                         levelSprite.ddx = -bullet.dx/10;
@@ -437,6 +452,20 @@
                 }
             }
 
+
+            if (levelSprite.properties.destroys) {
+                for (var j = 0; j < currentLevel.destructables.length; j++) {
+                    var item = currentLevel.destructables[j];
+                    if (!item.ttl) {
+                        continue;
+                    }
+                    if (levelSprite.collidesWith(item)) {
+                        item.ttl = 0;
+                        levelSprite.ttl = 0;
+                        j = currentLevel.destructables.length;
+                    }
+                }
+            }
         }
     }
 
@@ -523,6 +552,9 @@
             if (sprite.collidesWith(wall)) {
                 separateX(sprite, xPen);
             }
+            if (minDist === distanceBottom) {
+                timeSinceJump = jumpCooldown;
+            }
         }
         else {
             separateX(sprite, xPen);
@@ -564,6 +596,10 @@
      * @param level
      */
     function initLevel(level) {
+        if (level.destructables) {
+            level.destructables = [];
+        }
+
         unlinkMarkedSprites();
         tilePool.clear();
         for (var i = 0; i < level.map.length; i++) {
@@ -580,7 +616,8 @@
                     properties: {
                         index: level.map[i],
                         collides: true,
-                        movable: true
+                        movable: true,
+                        destroys: true
                     }
                 });
             }
@@ -597,9 +634,28 @@
                     properties: {
                         index: level.map[i],
                         collides: true,
-                        movable: false
+                        movable: false,
+                        destroys: false
                     }
                 });
+            }
+            else if (level.map[i] === 3) {
+                currentLevel.destructables.push(tilePool.get({
+                    x: tileWidth*(i%level.width),
+                    y: tileHeight*Math.floor(i/level.width),
+                    //color: 'midnightblue',
+                    image: d.getElementById('img_destruct'),
+                    //width: tileWidth,
+                    //height: tileHeight,
+                    dx: 0,
+                    ttl: Infinity,
+                    properties: {
+                        index: level.map[i],
+                        collides: true,
+                        movable: false,
+                        destroys: false
+                    }
+                }));
             }
             else if (level.map[i] === 9 && !player.properties.canPush) {
                 tilePool.get({
@@ -625,7 +681,8 @@
                     properties: {
                         index: level.map[i],
                         collides: false,
-                        movable: false
+                        movable: false,
+                        destroys: false
                     }
                 });
             }

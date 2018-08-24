@@ -1090,6 +1090,7 @@ this.kontra = {
 
                 this.objects[lastIndex] = obj;
                 inUse++;
+                return obj;
             },
 
             /**
