@@ -2,10 +2,27 @@
     'use strict';
     var DEBUG = true;
     var canvas = d.createElement('canvas');
+    var ctx = canvas.getContext('2d');
     var bgCanvas = d.createElement('canvas');
     var bgCtx = bgCanvas.getContext('2d');
-    var ctx = canvas.getContext('2d');
+    var textureCanvas  = d.createElement('canvas');
+    var textureCtx = textureCanvas.getContext('2d');
+    var noAlphaCanvas = d.createElement('canvas');
+    var noAlphaCtx = noAlphaCanvas.getContext('2d');
+
     ctx.imageSmoothingEnabled = false;
+    ctx.webkitImageSmoothingEnabled = false;
+    bgCtx.imageSmoothingEnabled = false;
+    bgCtx.webkitImageSmoothingEnabled = false;
+    textureCtx.imageSmoothingEnabled = false;
+    textureCtx.webkitImageSmoothingEnabled = false;
+    noAlphaCtx.imageSmoothingEnabled = false;
+    noAlphaCtx.webkitImageSmoothingEnabled = false;
+    window.onload = function(){
+        noAlphaCtx.filter = 'url(#remove-alpha)';
+        //ctx.filter = 'url(#remove-alpha)';
+    };
+
     var currentLevel = null;
     var jumpCooldown = 0.2;
     var timeSinceJump = 0.2;
@@ -16,6 +33,23 @@
     var mapColumns = 7;
     var buttonPrompt = null;
     var buttonPromptUpdate = null;
+    var markedSprites = [];
+
+    canvas.width = 360;
+    canvas.height = 400;
+    bgCanvas.width = canvas.width;
+    bgCanvas.height = canvas.height;
+    noAlphaCanvas.width = canvas.width;
+    noAlphaCanvas.height = canvas.height;
+
+    w.tileWidth = 10;
+    w.tileHeight = 20;
+
+    var tileWidth = w.tileWidth;
+    var tileHeight = w.tileHeight;
+
+    textureCanvas.width = tileWidth;
+    textureCanvas.height = tileHeight;
 
     //var intro = true;
     d.getElementById('img_bg').onload = function(){
@@ -27,7 +61,7 @@
     var worldCoord = {
         _x: 2,
         _y: 0,
-        prevX: 4,
+        prevX: 2,
         prevY: 0,
         get x() {
             return this._x;
@@ -46,13 +80,6 @@
             this._y = value;
         }
     };
-
-    canvas.width = 360;
-    canvas.height = 400;
-    bgCanvas.width = canvas.width;
-    bgCanvas.height = canvas.height;
-    w.tileWidth = 10;
-    w.tileHeight = 20;
 
     var scale = {
         x: w.innerWidth / canvas.width,
@@ -73,11 +100,6 @@
         create: kontra.sprite,
         maxSize: w.level3_0.width * w.level3_0.height
     });
-
-    var markedSprites = [];
-
-    var tileWidth = w.tileWidth;
-    var tileHeight = w.tileHeight;
 
     $('.c').appendChild(canvas);
 
@@ -163,13 +185,6 @@
         }
     });
 
-    var crossHair = kontra.sprite({
-        x: 100,
-        y: 100,
-        color: 'white',
-        width: 2,
-        height: 4
-    });
 
     var bullet = null;
 
@@ -194,9 +209,14 @@
                         type: 1
                     },
                     render: function() {
+                        var x = this.x;
+                        var y = this.y;
                         this.x = Math.round(this.x);
                         this.y = Math.round(this.y);
-                        this._drawImg();
+                        // Draw on rounded pixels to avoid anti-aliasing introducing more colors.
+                        this.draw();
+                        this.x = x;
+                        this.y = y;
                     }
                 });
             }
@@ -213,9 +233,14 @@
                     type: 2
                 },
                 render: function() {
+                    var x = this.x;
+                    var y = this.y;
                     this.x = Math.round(this.x);
                     this.y = Math.round(this.y);
-                    this._drawImg();
+                    // Draw on rounded pixels to avoid anti-aliasing introducing more colors.
+                    this.draw();
+                    this.x = x;
+                    this.y = y;
                 }
             });
         }
@@ -223,8 +248,8 @@
 
     var loop = kontra.gameLoop({
         update: function(dt) {
+            updatePointer(dt);
             updatePlayer(dt);
-            updateCrosshair(dt);
             updateBullets(dt);
 
             updateLevel(dt);
@@ -239,6 +264,7 @@
             // BG
             ctx.drawImage(bgCanvas, 0, 0);
             tilePool.render();
+            renderMarkedSprites();
             player.render();
             bulletPool.render();
             for (y = 0; y < mapRows; y++) {
@@ -253,8 +279,6 @@
 
             renderButtonPrompt();
 
-            crossHair.render();
-
             //postProcess();
         }
     });
@@ -266,6 +290,43 @@
 
     function renderIntro() {
         ctx.strokeText('Archeologists have uncovered the pyramid you were enjoying your ')
+    }
+
+    /**
+     * Renders the marked sprites with a green border and a line connecting them.
+     */
+    function renderMarkedSprites() {
+        if (markedSprites.length) {
+            for (y=0; y < markedSprites.length; y++) {
+                textureCtx.save();
+                textureCtx.clearRect(0, 0, textureCanvas.width, textureCanvas.height);
+                textureCtx.fillStyle = '#04dc27';
+                textureCtx.fillRect(0, 0, tileWidth, tileHeight);
+                textureCtx.drawImage(markedSprites[y].image, 1, 1, tileWidth-2, tileHeight-2, 1, 1, tileWidth-2, tileHeight-2);
+                textureCtx.restore();
+                ctx.drawImage(textureCanvas, markedSprites[y].x, markedSprites[y].y);
+            }
+        }
+
+        if (markedSprites.length === 2) {
+            noAlphaCtx.clearRect(0, 0, noAlphaCanvas.width, noAlphaCanvas.height);
+            noAlphaCtx.beginPath();
+            noAlphaCtx.strokeStyle = 'rgba(4, 220, 39, 1)';
+            noAlphaCtx.lineWidth = 2;
+            noAlphaCtx.moveTo(
+                Math.round(markedSprites[0].x + tileWidth/2),
+                Math.round(markedSprites[0].y + tileHeight/2)
+            );
+            noAlphaCtx.lineTo(
+                Math.round(markedSprites[1].x + tileWidth/2),
+                Math.round(markedSprites[1].y + tileHeight/2)
+            );
+            noAlphaCtx.stroke();
+            noAlphaCtx.stroke();
+
+
+            ctx.drawImage(noAlphaCanvas, 0, 0, noAlphaCanvas.width, noAlphaCanvas.height);
+        }
     }
 
     /*canvas.onclick = function() {
@@ -322,6 +383,10 @@
             unlinkMarkedSprites();
         }
 
+        if (kontra.keys.pressed('r')) {
+            loadLevel(true);
+        }
+
         if (player.x > currentLevel.width * tileWidth - (player.width/2)) {
             debugger;
             if (w['level' + (worldCoord.x+1) + '_' + worldCoord.y]) {
@@ -368,13 +433,9 @@
     /**
      * @param dt
      */
-    function updateCrosshair(dt) {
-        crossHair.update();
-        pointer.x = Math.round(kontra.pointer.x/scale.x - crossHair.width/2);
-        pointer.y = Math.round(kontra.pointer.y/scale.y - crossHair.height/2);
-
-        crossHair.x = pointer.x;
-        crossHair.y = pointer.y;
+    function updatePointer(dt) {
+        pointer.x = kontra.pointer.x/scale.x;
+        pointer.y = kontra.pointer.y/scale.y;
     }
 
     /**
@@ -392,12 +453,11 @@
         var bullet = bulletPool.getAliveObjects().length ? bulletPool.getAliveObjects()[0] : null;
         tilePool.update();
 
-        for (var i = 0; i < tilePool.size; i++) {
-            levelSprite = tilePool.objects[i];
-            if (!levelSprite.ttl) {
-                continue;
-            }
-            if (levelSprite.y > currentLevel.height*tileHeight || levelSprite.x < -tileWidth || levelSprite.x > (currentLevel.width*tileWidth) || levelSprite.y < -tileHeight && levelSprite.ttl > 0) {
+        var tiles = tilePool.getAliveObjects();
+
+        for (var i = 0; i < tiles.length; i++) {
+            levelSprite = tiles[i];
+            if (levelSprite.y > currentLevel.height*tileHeight || levelSprite.x < -tileWidth || levelSprite.x > (currentLevel.width*tileWidth) || levelSprite.y < -tileHeight) {
                 if (levelSprite.properties.marked) {
                     unlinkMarkedSprites();
                 }
@@ -414,10 +474,14 @@
 
             if (bullet && bullet.collidesWith(levelSprite)) {
                 if (bullet.properties.type === 1) {
-                    markedSprites.push(levelSprite);
-                    levelSprite.properties.marked = 1;
-                    levelSprite.properties.originalColor = levelSprite.color;
-                    levelSprite.color = 'green';
+                    // Don't handle the same sprite twice
+                    if (!markedSprites.length || markedSprites[0] !== levelSprite && levelSprite.properties.canLink) {
+                        markedSprites.push(levelSprite);
+                        levelSprite.properties.marked = 1;
+                        levelSprite.properties.originalColor = levelSprite.color;
+                        levelSprite.color = 'green';
+                    }
+                    // We got 2, link em up.
                     if (markedSprites.length > 1) {
                         linkMarkedSprites();
                     }
@@ -457,6 +521,9 @@
                         continue;
                     }
                     if (levelSprite.collidesWith(item)) {
+                        if (item.properties.marked || levelSprite.properties.marked) {
+                            unlinkMarkedSprites();
+                        }
                         item.ttl = 0;
                         levelSprite.ttl = 0;
                         j = currentLevel.destructables.length;
@@ -564,20 +631,29 @@
     /**
      *
      */
-    function loadLevel() {
+    function loadLevel(previousPosition) {
         var transitionPosition;
         var levelIndex = worldCoord.x + '_' + worldCoord.y;
 
-        if (currentLevel) {
-            transitionPosition = findTransitionPosition(currentLevel, w['level'+levelIndex]);
+        if (!previousPosition) {
+            if (currentLevel) {
+                transitionPosition = findTransitionPosition(currentLevel, w['level'+levelIndex]);
+            }
+            else {
+                transitionPosition = {
+                    x: 80,
+                    //++y: 0
+                    y: 57
+                };
+            }
         }
         else {
-            transitionPosition = {
-                x: 80,
-                //++y: 0
-                y: 57
-            };
+            transitionPosition = JSON.parse(localStorage.getItem('previousPosition'));
+            player.properties = JSON.parse(localStorage.getItem('previousSkills'));
+            removeButtonPrompt();
         }
+        localStorage.setItem('previousSkills', JSON.stringify(player.properties));
+        localStorage.setItem('previousPosition', JSON.stringify(transitionPosition));
         currentLevel = w['level' + levelIndex];
         initLevel(currentLevel);
         player.x = transitionPosition.x;
@@ -614,7 +690,8 @@
                         index: level.map[i],
                         collides: true,
                         movable: true,
-                        destroys: true
+                        destroys: true,
+                        canLink: true
                     }
                 });
             }
@@ -632,7 +709,8 @@
                         index: level.map[i],
                         collides: true,
                         movable: false,
-                        destroys: false
+                        destroys: false,
+                        canLink: true
                     }
                 });
             }
@@ -650,7 +728,32 @@
                         index: level.map[i],
                         collides: true,
                         movable: false,
-                        destroys: false
+                        destroys: false,
+                        canLink: true
+                    }
+                }));
+            }
+            else if (level.map[i] === 4) {
+                currentLevel.destructables.push(tilePool.get({
+                    x: tileWidth*(i%level.width),
+                    y: tileHeight*Math.floor(i/level.width),
+                    //color: 'midnightblue',
+                    image: d.getElementById('img_spike'),
+                    //width: tileWidth,
+                    //height: tileHeight,
+                    dx: 0,
+                    ttl: Infinity,
+                    properties: {
+                        index: level.map[i],
+                        collides: false,
+                        movable: false,
+                        destroys: false,
+                        canLink: false
+                    },
+                    update: function() {
+                        if (player.collidesWith(this) && (player.y > this.y)) {
+                            loadLevel(true);
+                        }
                     }
                 }));
             }
@@ -670,6 +773,35 @@
                             player.properties.canPush = true;
                             setButtonPrompt('click', function(){
                                 if (kontra.pointer.pressed('left')) {
+                                    removeButtonPrompt();
+                                }
+                            })
+                        }
+                    },
+                    properties: {
+                        index: level.map[i],
+                        collides: false,
+                        movable: false,
+                        destroys: false
+                    }
+                });
+            }
+            else if (level.map[i] === 10 && !player.properties.canLink) {
+                tilePool.get({
+                    x: tileWidth*(i%level.width),
+                    y: tileHeight*Math.floor(i/level.width),
+                    //color: 'midnightblue',
+                    image: d.getElementById('img_shot'),
+                    //width: tileWidth,
+                    //height: tileHeight,
+                    dx: 0,
+                    ttl: Infinity,
+                    update: function(){
+                        if (player.collidesWith(this)) {
+                            this.ttl = 0;
+                            player.properties.canLink = true;
+                            setButtonPrompt('rightclick', function(){
+                                if (kontra.pointer.pressed('right')) {
                                     removeButtonPrompt();
                                 }
                             })
@@ -704,7 +836,7 @@
 
         for (var i = 0; i < tiles.length; i++) {
             tile = tiles[i];
-            if (!tile.collidesWith(fakeSprite)) {
+            if (!tile.properties.collides || !tile.collidesWith(fakeSprite)) {
                 continue;
             }
             sprite.properties.grounded = true;
