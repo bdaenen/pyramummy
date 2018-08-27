@@ -13,7 +13,7 @@
     var playerAnimationTimerValue = 100;
     var playerAnimationTimer = playerAnimationTimerValue;
     var mapRows = 4;
-    var mapColumns = 6;
+    var mapColumns = 7;
     var buttonPrompt = null;
     var buttonPromptUpdate = null;
 
@@ -25,7 +25,7 @@
         bgCtx.fill();
     };
     var worldCoord = {
-        _x: 4,
+        _x: 2,
         _y: 0,
         prevX: 4,
         prevY: 0,
@@ -97,14 +97,11 @@
     var y;
     for (y = 0; y < mapRows; y++) {
         var cols = mapColumns - y;
-        var last = (y === mapRows-1);
-        if (last) {
-            cols++;
-        }
+
         for (x = y; x < cols; x++) {
             minimap_levels[y] = minimap_levels[y] || [];
             minimap_levels[y][x] = kontra.sprite({
-                x: !last ? minimap.x+2 + (x*7+x) : minimap.x+2 + (x*7+x-4),
+                x: minimap.x+2 + (x*7+x-4),
                 y: minimap.y+minimap.height-20 - (y*18+y),
                 width: 7,
                 height: 18,

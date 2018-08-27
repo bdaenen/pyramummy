@@ -65,5 +65,6 @@ level2_0.indexFromTileXY = function(x, y) {
 */
 level2_0.spriteMap = [];
 
+level2_0.destructables = [];
 
 w.level2_0 = level2_0;
