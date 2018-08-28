@@ -59,7 +59,7 @@
         bgCtx.fill();
     };
     var worldCoord = {
-        _x: 2,
+        _x: 4,
         _y: 0,
         prevX: 2,
         prevY: 0,
@@ -266,6 +266,9 @@
             tilePool.render();
             renderMarkedSprites();
             player.render();
+            currentLevel.destructables.forEach(function(destr){
+                destr.ttl > 0 && destr.render();
+            });
             bulletPool.render();
             for (y = 0; y < mapRows; y++) {
                 var cols = mapColumns - y;
@@ -472,7 +475,7 @@
                 }
             }
 
-            if (bullet && bullet.collidesWith(levelSprite)) {
+            if (bullet && levelSprite.properties.collides && bullet.collidesWith(levelSprite)) {
                 if (bullet.properties.type === 1) {
                     // Don't handle the same sprite twice
                     if (!markedSprites.length || markedSprites[0] !== levelSprite && levelSprite.properties.canLink) {
@@ -517,7 +520,7 @@
             if (levelSprite.properties.destroys) {
                 for (var j = 0; j < currentLevel.destructables.length; j++) {
                     var item = currentLevel.destructables[j];
-                    if (!item.ttl) {
+                    if (item.ttl <= 0) {
                         continue;
                     }
                     if (levelSprite.collidesWith(item)) {
@@ -726,7 +729,7 @@
                     ttl: Infinity,
                     properties: {
                         index: level.map[i],
-                        collides: true,
+                        collides: false,
                         movable: false,
                         destroys: false,
                         canLink: true
