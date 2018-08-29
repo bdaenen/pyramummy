@@ -9,6 +9,31 @@
     var textureCtx = textureCanvas.getContext('2d');
     var noAlphaCanvas = d.createElement('canvas');
     var noAlphaCtx = noAlphaCanvas.getContext('2d');
+    var gameOverTime = 10 * 60;
+    var gameOverTimer = gameOverTime;
+    var isGameOver = false;
+
+    var musicPlayer = new CPlayer();
+    musicPlayer.init(w.song);
+    var done = false;
+
+    var soundInterval = setInterval(function(){
+        done = (musicPlayer.generate() >= 1);
+        if (done) {
+            clearInterval(soundInterval);
+            var wave = musicPlayer.createWave();
+            var audio = d.createElement('audio');
+            audio.src = URL.createObjectURL(new Blob([wave], {type: 'audio/wav'}));
+            audio.loop = true;
+            audio.volume = 0.8;
+            audio.addEventListener('ended', function() {
+                this.currentTime = 0;
+                this.play();
+            }, false);
+            audio.play();
+            initGame();
+        }
+    }, 250);
 
     ctx.imageSmoothingEnabled = false;
     ctx.webkitImageSmoothingEnabled = false;
@@ -28,6 +53,8 @@
     var timeSinceJump = 0.2;
     var bgPattern = null;
     var playerAnimationTimerValue = 100;
+    var walkAudioTimerValue = 200;
+    var walkAudioTimer = walkAudioTimerValue;
     var playerAnimationTimer = playerAnimationTimerValue;
     var mapRows = 4;
     var mapColumns = 7;
@@ -41,6 +68,9 @@
     bgCanvas.height = canvas.height;
     noAlphaCanvas.width = canvas.width;
     noAlphaCanvas.height = canvas.height;
+
+    ctx.fillStyle = 'rgb(113,95,52)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     w.tileWidth = 10;
     w.tileHeight = 20;
@@ -61,7 +91,7 @@
     var worldCoord = {
         _x: 4,
         _y: 0,
-        prevX: 2,
+        prevX: 4,
         prevY: 0,
         get x() {
             return this._x;
@@ -192,21 +222,49 @@
         e.preventDefault();
     });
 
-    kontra.pointer.onDown(function(e) {
-        var angle = Math.atan2(pointer.y - (player.y+player.height/2), pointer.x - (player.x+player.width/2));
-        var dist = 5;
 
-        if (e.button !== 0 && player.properties.canLink) {
-            if (markedSprites.length < 2) {
-                bulletPool.get({
+    function initGame() {
+        kontra.pointer.onDown(function(e) {
+            var angle = Math.atan2(pointer.y - (player.y+player.height/2), pointer.x - (player.x+player.width/2));
+            var dist = 5;
+
+            if (e.button !== 0 && player.properties.canLink) {
+                if (markedSprites.length < 2) {
+                    if(bulletPool.get({
+                        x: player.x,
+                        y: player.y,
+                        dx: Math.cos(angle)*dist,
+                        dy: Math.sin(angle)*dist,
+                        image: d.getElementById('img_shot'),
+                        ttl: 60,
+                        properties: {
+                            type: 1
+                        },
+                        render: function() {
+                            var x = this.x;
+                            var y = this.y;
+                            this.x = Math.round(this.x);
+                            this.y = Math.round(this.y);
+                            // Draw on rounded pixels to avoid anti-aliasing introducing more colors.
+                            this.draw();
+                            this.x = x;
+                            this.y = y;
+                        }
+                    })) {
+                        w.playSfx('link');
+                    }
+                }
+            }
+            else if (e.button === 0 && player.properties.canPush) {
+                if (bulletPool.get({
                     x: player.x,
                     y: player.y,
                     dx: Math.cos(angle)*dist,
                     dy: Math.sin(angle)*dist,
-                    image: d.getElementById('img_shot'),
+                    image: d.getElementById('img_shot2'),
                     ttl: 60,
                     properties: {
-                        type: 1
+                        type: 2
                     },
                     render: function() {
                         var x = this.x;
@@ -218,81 +276,89 @@
                         this.x = x;
                         this.y = y;
                     }
+                })) {
+                    w.playSfx('shoot');
+                }
+            }
+        });
+
+        var loop = kontra.gameLoop({
+            update: function(dt) {
+                gameOverTimer -= dt;
+                if (gameOverTimer <= 0) {
+                    isGameOver = true;
+                    return;
+                }
+                updatePointer(dt);
+                updatePlayer(dt);
+                updateBullets(dt);
+
+                updateLevel(dt);
+                updateLinkedSprites(dt);
+                minimap.update();
+                buttonPrompt && buttonPromptUpdate && buttonPromptUpdate();
+            },
+            render: function() {
+                /*if (intro) {
+                    return renderIntro();
+                }*/
+
+                if (isGameOver) {
+                    return renderGameOver();
+                }
+
+                // BG
+                ctx.drawImage(bgCanvas, 0, 0);
+                tilePool.render();
+                renderMarkedSprites();
+                player.render();
+                currentLevel.destructables.forEach(function(destr){
+                    destr.ttl > 0 && destr.render();
                 });
+                bulletPool.render();
+                for (y = 0; y < mapRows; y++) {
+                    var cols = mapColumns - y;
+                    if (cols === y) {
+                        cols++;
+                    }
+                    for (x = y; x < cols; x++) {
+                        minimap_levels[y][x].render();
+                    }
+                }
+
+                renderButtonPrompt();
+                renderGameOverTimer();
+
+                //postProcess();
             }
-        }
-        else if (e.button === 0 && player.properties.canPush) {
-            bulletPool.get({
-                x: player.x,
-                y: player.y,
-                dx: Math.cos(angle)*dist,
-                dy: Math.sin(angle)*dist,
-                image: d.getElementById('img_shot2'),
-                ttl: 60,
-                properties: {
-                    type: 2
-                },
-                render: function() {
-                    var x = this.x;
-                    var y = this.y;
-                    this.x = Math.round(this.x);
-                    this.y = Math.round(this.y);
-                    // Draw on rounded pixels to avoid anti-aliasing introducing more colors.
-                    this.draw();
-                    this.x = x;
-                    this.y = y;
-                }
-            });
-        }
-    });
+        });
 
-    var loop = kontra.gameLoop({
-        update: function(dt) {
-            updatePointer(dt);
-            updatePlayer(dt);
-            updateBullets(dt);
+        loadLevel();
 
-            updateLevel(dt);
-            updateLinkedSprites(dt);
-            minimap.update();
-            buttonPrompt && buttonPromptUpdate && buttonPromptUpdate();
-        },
-        render: function() {
-            /*if (intro) {
-                return renderIntro();
-            }*/
-            // BG
-            ctx.drawImage(bgCanvas, 0, 0);
-            tilePool.render();
-            renderMarkedSprites();
-            player.render();
-            currentLevel.destructables.forEach(function(destr){
-                destr.ttl > 0 && destr.render();
-            });
-            bulletPool.render();
-            for (y = 0; y < mapRows; y++) {
-                var cols = mapColumns - y;
-                if (cols === y) {
-                    cols++;
-                }
-                for (x = y; x < cols; x++) {
-                    minimap_levels[y][x].render();
-                }
-            }
+        loop.start();
+    }
 
-            renderButtonPrompt();
+    /**
+     * Game over!
+     */
+    function renderGameOver() {
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(d.getElementById('img_game_over'), 0, 0);
+    }
 
-            //postProcess();
-        }
-    });
-
-    loadLevel();
-
-    loop.start();
-
-
-    function renderIntro() {
-        ctx.strokeText('Archeologists have uncovered the pyramid you were enjoying your ')
+    /**
+     * Render time left
+     */
+    function renderGameOverTimer() {
+        noAlphaCtx.clearRect(0, 0, noAlphaCanvas.width, noAlphaCanvas.height);
+        noAlphaCtx.strokeStyle = '#000000';
+        noAlphaCtx.fillStyle = '#fff275';
+        noAlphaCtx.lineWidth = 2;
+        noAlphaCtx.strokeRect(20, 20, 30, 15);
+        noAlphaCtx.fillRect(20, 20, Math.round((gameOverTimer/gameOverTime)*30), 15);
+        ctx.drawImage(noAlphaCanvas, 290, -18);
+        ctx.drawImage(d.getElementById('img_clock'), 343, 1);
     }
 
     /**
@@ -345,23 +411,41 @@
         player.update();
         if (kontra.keys.pressed('left') || kontra.keys.pressed('q') || kontra.keys.pressed('a')) {
             playerAnimationTimer -= dt*1000;
+            if (player.properties.grounded) {
+                walkAudioTimer -= dt*1000;
+                if (!w.sfxIsPlaying('walk') && walkAudioTimer < 0) {
+                    w.playSfx('walk');
+                    walkAudioTimer = walkAudioTimerValue;
+                }
+            }
             player.properties.mirror = true;
             if (player.properties.canSprint && kontra.keys.pressed('shift')) {
+                walkAudioTimerValue = 150;
                 player.x -= 2;
             }
             else {
+                walkAudioTimerValue = 200;
                 player.x -= 1;
             }
         }
         else if (kontra.keys.pressed('right') || kontra.keys.pressed('d')) {
             playerAnimationTimer -= dt*1000;
+            if (player.properties.grounded) {
+                walkAudioTimer -= dt*1000;
+                if (!w.sfxIsPlaying('walk') && walkAudioTimer < 0) {
+                    w.playSfx('walk');
+                    walkAudioTimer = walkAudioTimerValue;
+                }
+            }
             player.properties.mirror = false;
 
             if (player.properties.canSprint && kontra.keys.pressed('shift')) {
                 player.x += 2;
+                walkAudioTimerValue = 150;
             }
             else {
                 player.x += 1;
+                walkAudioTimerValue = 200;
             }
         }
 
@@ -376,6 +460,7 @@
 
         if ((kontra.keys.pressed('up') || kontra.keys.pressed('z') || kontra.keys.pressed('w')) && timeSinceJump >= jumpCooldown && player.properties.grounded) {
             player.velocity.y = -6.5;
+            w.playSfx('jump');
             timeSinceJump = 0;
         }
         else {
@@ -390,6 +475,7 @@
             loadLevel(true);
         }
 
+        debugger;
         if (player.x > currentLevel.width * tileWidth - (player.width/2)) {
             debugger;
             if (w['level' + (worldCoord.x+1) + '_' + worldCoord.y]) {
@@ -483,6 +569,7 @@
                         levelSprite.properties.marked = 1;
                         levelSprite.properties.originalColor = levelSprite.color;
                         levelSprite.color = 'green';
+                        w.playSfx('hit');
                     }
                     // We got 2, link em up.
                     if (markedSprites.length > 1) {
@@ -491,6 +578,7 @@
                 }
                 else if (bullet.properties.type === 2) {
                     if (levelSprite.properties.movable) {
+                        w.playSfx('hit');
                         levelSprite.dx = bullet.dx;
                         levelSprite.dy = bullet.dy;
                         levelSprite.ddx = -bullet.dx/10;
@@ -772,6 +860,10 @@
                     ttl: Infinity,
                     update: function(){
                         if (player.collidesWith(this)) {
+                            if (!this.properties.played) {
+                                w.playSfx('powerup');
+                                this.properties.played = true;
+                            }
                             this.ttl = 0;
                             player.properties.canPush = true;
                             setButtonPrompt('click', function(){
@@ -785,7 +877,8 @@
                         index: level.map[i],
                         collides: false,
                         movable: false,
-                        destroys: false
+                        destroys: false,
+                        played: false
                     }
                 });
             }
@@ -801,6 +894,10 @@
                     ttl: Infinity,
                     update: function(){
                         if (player.collidesWith(this)) {
+                            if (!this.properties.played) {
+                                w.playSfx('powerup');
+                                this.properties.played = true;
+                            }
                             this.ttl = 0;
                             player.properties.canLink = true;
                             setButtonPrompt('rightclick', function(){
@@ -814,7 +911,8 @@
                         index: level.map[i],
                         collides: false,
                         movable: false,
-                        destroys: false
+                        destroys: false,
+                        played: false
                     }
                 });
             }
@@ -831,21 +929,36 @@
             width: sprite.width,
             height: sprite.height
         };
+        var isGrounded = false;
 
         var tiles = tilePool.getAliveObjects();
         var tile;
-        sprite.properties.grounded = false;
-        sprite.properties.groundedTile = null;
+
 
         for (var i = 0; i < tiles.length; i++) {
             tile = tiles[i];
             if (!tile.properties.collides || !tile.collidesWith(fakeSprite)) {
                 continue;
             }
-            sprite.properties.grounded = true;
-            sprite.properties.groundedTile = tile;
+            isGrounded = true;
             break;
         }
+
+        if ((isGrounded && sprite.properties.grounded) || (!isGrounded && !sprite.properties.grounded)) {
+            return;
+        }
+
+        if (isGrounded && !sprite.properties.grounded) {
+            sprite.properties.grounded = true;
+            sprite.properties.groundedTile = tile;
+            w.playSfx('walk');
+            walkAudioTimer = walkAudioTimerValue;
+        }
+        else {
+            sprite.properties.grounded = false;
+            sprite.properties.groundedTile = null;
+        }
+
     }
 
     /**
