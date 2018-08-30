@@ -1,6 +1,6 @@
 (function() {
     'use strict';
-    var DEBUG = true;
+    var DEBUG = false;
     var canvas = d.createElement('canvas');
     var ctx = canvas.getContext('2d');
     var bgCanvas = d.createElement('canvas');
@@ -25,7 +25,7 @@
             var audio = d.createElement('audio');
             audio.src = URL.createObjectURL(new Blob([wave], {type: 'audio/wav'}));
             audio.loop = true;
-            audio.volume = 0.8;
+            audio.volume = 0.2;
             audio.addEventListener('ended', function() {
                 this.currentTime = 0;
                 this.play();
@@ -89,7 +89,7 @@
         bgCtx.fill();
     };
     var worldCoord = {
-        _x: 4,
+        _x: 2,
         _y: 0,
         prevX: 4,
         prevY: 0,
@@ -136,8 +136,8 @@
     kontra.init();
 
     var minimap = kontra.sprite({
-       x: 290,
-       y: 32,
+       x: 305,
+       y: 20,
        color: 'rgba(66, 66, 66, 1)',
         width: 51,
         height: 62
@@ -357,8 +357,8 @@
         noAlphaCtx.lineWidth = 2;
         noAlphaCtx.strokeRect(20, 20, 30, 15);
         noAlphaCtx.fillRect(20, 20, Math.round((gameOverTimer/gameOverTime)*30), 15);
-        ctx.drawImage(noAlphaCanvas, 290, -18);
-        ctx.drawImage(d.getElementById('img_clock'), 343, 1);
+        ctx.drawImage(noAlphaCanvas, 297, 65);
+        ctx.drawImage(d.getElementById('img_clock'), 349, 84);
     }
 
     /**
@@ -732,7 +732,7 @@
             }
             else {
                 transitionPosition = {
-                    x: 80,
+                    x: 300,//80,
                     //++y: 0
                     y: 57
                 };
@@ -843,6 +843,7 @@
                     },
                     update: function() {
                         if (player.collidesWith(this) && (player.y > this.y)) {
+                            w.playSfx('death')
                             loadLevel(true);
                         }
                     }
@@ -850,7 +851,7 @@
             }
             else if (level.map[i] === 9 && !player.properties.canPush) {
                 tilePool.get({
-                    x: tileWidth*(i%level.width),
+                    x: tileWidth*(i%level.width) - tileWidth/2,
                     y: tileHeight*Math.floor(i/level.width),
                     //color: 'midnightblue',
                     image: d.getElementById('img_shot2'),
@@ -902,6 +903,40 @@
                             player.properties.canLink = true;
                             setButtonPrompt('rightclick', function(){
                                 if (kontra.pointer.pressed('right')) {
+                                    removeButtonPrompt();
+                                }
+                            })
+                        }
+                    },
+                    properties: {
+                        index: level.map[i],
+                        collides: false,
+                        movable: false,
+                        destroys: false,
+                        played: false
+                    }
+                });
+            }
+            else if (level.map[i] === 11 && !player.properties.canSprint) {
+                tilePool.get({
+                    x: tileWidth*(i%level.width) - tileWidth/2,
+                    y: tileHeight*Math.floor(i/level.width),
+                    //color: 'midnightblue',
+                    image: d.getElementById('img_sprint'),
+                    //width: tileWidth,
+                    //height: tileHeight,
+                    dx: 0,
+                    ttl: Infinity,
+                    update: function(){
+                        if (player.collidesWith(this)) {
+                            if (!this.properties.played) {
+                                w.playSfx('powerup');
+                                this.properties.played = true;
+                            }
+                            this.ttl = 0;
+                            player.properties.canSprint = true;
+                            setButtonPrompt('shift', function(){
+                                if (kontra.pointer.pressed('shift')) {
                                     removeButtonPrompt();
                                 }
                             })
