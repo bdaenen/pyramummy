@@ -16,7 +16,6 @@
     var musicPlayer = new CPlayer();
     musicPlayer.init(w.song);
     var done = false;
-
     var soundInterval = setInterval(function(){
         done = (musicPlayer.generate() >= 1);
         if (done) {
