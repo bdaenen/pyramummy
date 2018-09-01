@@ -1,6 +1,24 @@
 (function() {
     'use strict';
     var DEBUG = true;
+    if (DEBUG) {
+        kontra.keys.bind('o', function(){
+            worldCoord.y++;
+            loadLevel();
+        });
+        kontra.keys.bind('l', function(){
+            worldCoord.y--;
+            loadLevel();
+        });
+        kontra.keys.bind('m', function(){
+            worldCoord.x++;
+            loadLevel();
+        });
+        kontra.keys.bind('k', function(){
+            worldCoord.x--;
+            loadLevel();
+        });
+    }
     var canvas = d.createElement('canvas');
     var ctx = canvas.getContext('2d');
     var bgCanvas = d.createElement('canvas');
@@ -13,6 +31,7 @@
     var gameOverTimer = gameOverTime;
     var isGameOver = false;
     var audio;
+    var buttonPromptCoords;
 
     var musicPlayer = new CPlayer();
     musicPlayer.init(w.song);
@@ -59,6 +78,8 @@
     var buttonPrompt = null;
     var buttonPromptUpdate = null;
     var markedSprites = [];
+    var loadLevelNextUpdate;
+    var loadLevelNextUpdatePosition;
 
     canvas.width = 360;
     canvas.height = 400;
@@ -70,10 +91,10 @@
     d.getElementById('img_intro').onload = function(){
         ctx.drawImage(d.getElementById('img_intro'), 0, 0, 360, 400);
         canvas.addEventListener('click', function bootGame(){
-            if (audio) {
+            if (DEBUG || audio) {
                canvas.removeEventListener('click', bootGame);
                initGame();
-               audio.play(0);
+            //   audio.play(0);
             }
         });
     };
@@ -176,7 +197,7 @@
                 },
                 render: function(){
                     if (this.properties.currentLevel) {
-                        this.color = '#1d86df'
+                        this.color = '#33beff'
                     }
                     else if (this.properties.visited) {
                         this.color = '#dfab1d'
@@ -200,7 +221,8 @@
             grounded: false,
             canLink: DEBUG,
             canPush: DEBUG,
-            canSprint: DEBUG
+            canSprint: false,
+            hasKey: DEBUG
         },
         render: function(){
             var deltaY = 0;
@@ -226,13 +248,9 @@
         }
     });
 
-
-    var bullet = null;
-
     d.body.addEventListener('contextmenu', function(e){
         e.preventDefault();
     });
-
 
     function initGame() {
         kontra.pointer.onDown(function(e) {
@@ -486,9 +504,7 @@
             loadLevel(true);
         }
 
-        debugger;
         if (player.x > currentLevel.width * tileWidth - (player.width/2)) {
-            debugger;
             if (w['level' + (worldCoord.x+1) + '_' + worldCoord.y]) {
                 worldCoord.x++;
                 loadLevel();
@@ -575,7 +591,7 @@
             if (bullet && levelSprite.properties.collides && bullet.collidesWith(levelSprite)) {
                 if (bullet.properties.type === 1) {
                     // Don't handle the same sprite twice
-                    if (!markedSprites.length || markedSprites[0] !== levelSprite && levelSprite.properties.canLink) {
+                    if ((!markedSprites.length || markedSprites[0] !== levelSprite) && levelSprite.properties.canLink) {
                         markedSprites.push(levelSprite);
                         levelSprite.properties.marked = 1;
                         levelSprite.properties.originalColor = levelSprite.color;
@@ -632,6 +648,12 @@
                     }
                 }
             }
+        }
+
+        if (loadLevelNextUpdate) {
+            loadLevel(loadLevelNextUpdatePosition);
+            loadLevelNextUpdate = false;
+            loadLevelNextUpdatePosition = false;
         }
     }
 
@@ -744,9 +766,14 @@
             else {
                 transitionPosition = {
                     x: 80,
-                    //++y: 0
                     y: 57
                 };
+            }
+        }
+        else if (previousPosition.x && previousPosition.y) {
+            transitionPosition = {
+                x: previousPosition.x,
+                y: previousPosition.y
             }
         }
         else {
@@ -782,10 +809,7 @@
                 tilePool.get({
                     x: tileWidth*(i%level.width),
                     y: tileHeight*Math.floor(i/level.width),
-                    //color: 'midnightblue',
                     image: d.getElementById('img_wall'),
-                    //width: tileWidth,
-                    //height: tileHeight,
                     dx: 0,
                     ttl: Infinity,
                     properties: {
@@ -801,10 +825,7 @@
                 tilePool.get({
                     x: tileWidth*(i%level.width),
                     y: tileHeight*Math.floor(i/level.width),
-                    //color: 'midnightblue',
                     image: d.getElementById('img_wall_hard'),
-                    //width: tileWidth,
-                    //height: tileHeight,
                     dx: 0,
                     ttl: Infinity,
                     properties: {
@@ -820,10 +841,7 @@
                 currentLevel.destructables.push(tilePool.get({
                     x: tileWidth*(i%level.width),
                     y: tileHeight*Math.floor(i/level.width),
-                    //color: 'midnightblue',
                     image: d.getElementById('img_destruct'),
-                    //width: tileWidth,
-                    //height: tileHeight,
                     dx: 0,
                     ttl: Infinity,
                     properties: {
@@ -831,18 +849,15 @@
                         collides: false,
                         movable: false,
                         destroys: false,
-                        canLink: true
+                        canLink: false
                     }
                 }));
             }
             else if (level.map[i] === 4) {
-                currentLevel.destructables.push(tilePool.get({
+                tilePool.get({
                     x: tileWidth*(i%level.width),
                     y: tileHeight*Math.floor(i/level.width),
-                    //color: 'midnightblue',
                     image: d.getElementById('img_spike'),
-                    //width: tileWidth,
-                    //height: tileHeight,
                     dx: 0,
                     ttl: Infinity,
                     properties: {
@@ -854,20 +869,107 @@
                     },
                     update: function() {
                         if (player.collidesWith(this) && (player.y > this.y)) {
-                            w.playSfx('death')
+                            w.playSfx('death');
                             loadLevel(true);
                         }
                     }
-                }));
+                });
+            }
+            else if (level.map[i] === 5) {
+                tilePool.get({
+                    x: tileWidth*(i%level.width),
+                    y: tileHeight*Math.floor(i/level.width),
+                    image: d.getElementById('img_keyhole'),
+                    dx: 0,
+                    ttl: Infinity,
+                    properties: {
+                        index: level.map[i],
+                        collides: true,
+                        movable: false,
+                        destroys: false,
+                        canLink: false
+                    },
+                    update: function() {
+                        if (player.collidesWith(this) && player.properties.hasKey) {
+                            if (!this.properties.played) {
+                                w.playSfx('hit');
+                                this.properties.played = true;
+                            }
+                            this.ttl = 0;
+                        }
+                    }
+                });
+            }
+            else if (level.map[i] === 6 && !player.properties.hasKey) {
+                tilePool.get({
+                    x: tileWidth*(i%level.width),
+                    y: tileHeight*Math.floor(i/level.width),
+                    image: d.getElementById('img_key'),
+                    dx: 0,
+                    ttl: Infinity,
+                    properties: {
+                        index: level.map[i],
+                        collides: false,
+                        movable: false,
+                        destroys: false,
+                        canLink: false
+                    },
+                    update: function() {
+                        if (player.collidesWith(this)) {
+                            if (!this.properties.played) {
+                                w.playSfx('powerup');
+                                this.properties.played = true;
+                            }
+                            this.ttl = 0;
+                            player.properties.hasKey = true;
+                            setButtonPrompt('key', function(){
+                                setTimeout(function(){
+                                    removeButtonPrompt();
+                                }, 3000);
+                            });
+                        }
+                    }
+                });
+            }
+            else if (level.map[i] === 7) {
+                tilePool.get({
+                    x: tileWidth*(i%level.width),
+                    y: tileHeight*Math.floor(i/level.width),
+                    image: d.getElementById('img_portal'),
+                    dx: 0,
+                    ttl: Infinity,
+                    properties: {
+                        index: level.map[i],
+                        collides: false,
+                        movable: false,
+                        destroys: false,
+                        canLink: false
+                    },
+                    update: function() {
+                        if (player.collidesWith(this)) {
+                            this.ttl = 0;
+                            if (worldCoord.x === 1) {
+                                worldCoord.x = 5;
+                            }
+                            else {
+                                worldCoord.x = 1;
+                            }
+                            if (!this.properties.played) {
+                                w.playSfx('warp');
+                                this.properties.played = true;
+
+                                loadLevelNextUpdate = true;
+                                loadLevelNextUpdatePosition = player;
+                            }
+                        }
+                    }
+                });
             }
             else if (level.map[i] === 9 && !player.properties.canPush) {
                 tilePool.get({
                     x: tileWidth*(i%level.width) - tileWidth/2,
                     y: tileHeight*Math.floor(i/level.width),
-                    //color: 'midnightblue',
                     image: d.getElementById('img_shot2'),
-                    //width: tileWidth,
-                    //height: tileHeight,
                     dx: 0,
                     ttl: Infinity,
                     update: function(){
@@ -898,10 +1000,7 @@
                 tilePool.get({
                     x: tileWidth*(i%level.width),
                     y: tileHeight*Math.floor(i/level.width),
-                    //color: 'midnightblue',
                     image: d.getElementById('img_shot'),
-                    //width: tileWidth,
-                    //height: tileHeight,
                     dx: 0,
                     ttl: Infinity,
                     update: function(){
@@ -932,10 +1031,7 @@
                 tilePool.get({
                     x: tileWidth*(i%level.width) - tileWidth/2,
                     y: tileHeight*Math.floor(i/level.width),
-                    //color: 'midnightblue',
                     image: d.getElementById('img_sprint'),
-                    //width: tileWidth,
-                    //height: tileHeight,
                     dx: 0,
                     ttl: Infinity,
                     update: function(){
@@ -947,10 +1043,38 @@
                             this.ttl = 0;
                             player.properties.canSprint = true;
                             setButtonPrompt('shift', function(){
-                                if (kontra.pointer.pressed('shift')) {
+                                if (kontra.keys.pressed('shift')) {
                                     removeButtonPrompt();
                                 }
-                            })
+                            }, 135, 60)
+                        }
+                    },
+                    properties: {
+                        index: level.map[i],
+                        collides: false,
+                        movable: false,
+                        destroys: false,
+                        played: false
+                    }
+                });
+            }
+            else if (level.map[i] === 12 && !player.properties.extraTime) {
+                tilePool.get({
+                    x: tileWidth*(i%level.width) - tileWidth/2,
+                    y: tileHeight*Math.floor(i/level.width),
+                    image: d.getElementById('img_clock'),
+                    dx: 0,
+                    ttl: Infinity,
+                    update: function(){
+                        if (player.collidesWith(this)) {
+                            if (!this.properties.played) {
+                                w.playSfx('powerup');
+                                this.properties.played = true;
+                            }
+                            this.ttl = 0;
+                            player.properties.extraTime = true;
+                            gameOverTime += 5 * 60;
+                            gameOverTimer += 5 * 60;
                         }
                     },
                     properties: {
@@ -1139,15 +1263,28 @@
      */
     function renderButtonPrompt() {
         if (buttonPrompt) {
-            ctx.drawImage(d.getElementById('img_button_' + buttonPrompt), canvas.width/2, canvas.height/2);
+            ctx.drawImage(d.getElementById('img_button_' + buttonPrompt), buttonPromptCoords.x, buttonPromptCoords.y);
         }
     }
 
     /**
      * @param button
      * @param update
+     * @param [x]
+     * @param [y]
      */
-    function setButtonPrompt(button, update) {
+    function setButtonPrompt(button, update, x, y) {
+        if (x && y) {
+            buttonPromptCoords = {
+                x: x, y: y
+            }
+        }
+        else {
+            buttonPromptCoords = {
+                x: canvas.width/2,
+                y: canvas.height/2
+            }
+        }
         buttonPrompt = button;
         buttonPromptUpdate = update;
     }

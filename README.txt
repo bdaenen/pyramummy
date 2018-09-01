@@ -26,8 +26,10 @@ R: Reset current room. Useful when fully locking up rooms
 
 Known bugs
 -----------
-- Collision separation is quite bad, hitting any wall horizontally will stop your vertical momentum and "eat" your jump.
+- Collision separation is quite poor:
+    - hitting any wall horizontally will stop your vertical momentum and "eat" your jump
+    - landing often aligns your X position with a tile.
 - The title screen is only clickable after a few seconds (unresponsive while music is generating)
 - Very rarely the background layer does not show up. Refresh to fix.
 - Very rarely linked block movement is not consistent. Reset the link (space) or reset the room (R) to fix.
-- You can probably find some ways to break the game or sequence-break by using its unique mechanic :)
+- You can probably find some ways to sequence-break or really break the game by using its unique mechanic :)
