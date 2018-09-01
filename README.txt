@@ -29,6 +29,7 @@ Known bugs
 - Collision separation is quite poor:
     - hitting any wall horizontally will stop your vertical momentum and "eat" your jump
     - landing often aligns your X position with a tile.
+    - my sincerest apologies for all the unfair deaths due to slipping off of a block above a spike pit. I could not fix this within the given timeframe.
 - The title screen is only clickable after a few seconds (unresponsive while music is generating)
 - Very rarely the background layer does not show up. Refresh to fix.
 - Very rarely linked block movement is not consistent. Reset the link (space) or reset the room (R) to fix.

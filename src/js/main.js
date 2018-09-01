@@ -27,6 +27,8 @@
     var textureCtx = textureCanvas.getContext('2d');
     var noAlphaCanvas = d.createElement('canvas');
     var noAlphaCtx = noAlphaCanvas.getContext('2d');
+    var greenCanvas = d.createElement('canvas');
+    var greenCtx = greenCanvas.getContext('2d');
     var gameOverTime = 10 * 60;
     var gameOverTimer = gameOverTime;
     var isGameOver = false;
@@ -62,6 +64,7 @@
     noAlphaCtx.webkitImageSmoothingEnabled = false;
     window.onload = function(){
         noAlphaCtx.filter = 'url(#remove-alpha)';
+        greenCanvas.filter = 'url(#only-green)';
         //ctx.filter = 'url(#remove-alpha)';
     };
 
@@ -87,6 +90,8 @@
     bgCanvas.height = canvas.height;
     noAlphaCanvas.width = canvas.width;
     noAlphaCanvas.height = canvas.height;
+    greenCanvas.width = canvas.width;
+    greenCanvas.height = canvas.height;
 
     d.getElementById('img_intro').onload = function(){
         ctx.drawImage(d.getElementById('img_intro'), 0, 0, 360, 400);
@@ -94,7 +99,7 @@
             if (DEBUG || audio) {
                canvas.removeEventListener('click', bootGame);
                initGame();
-            //   audio.play(0);
+               audio.play(0);
             }
         });
     };
@@ -196,13 +201,21 @@
                     currentLevel: false
                 },
                 render: function(){
+                    if (worldCoord.x === 1 && worldCoord.y === 1) {
+                        var oldX = this.x;
+                        this.x -= 295;
+                    }
                     if (this.properties.currentLevel) {
                         this.color = '#33beff'
                     }
                     else if (this.properties.visited) {
                         this.color = '#dfab1d'
                     }
-                    this._draw();
+                    this.draw();
+
+                    if (worldCoord.x === 1 && worldCoord.y === 1) {
+                        this.x = oldX;
+                    }
                 }
             });
         }
@@ -212,17 +225,14 @@
         x: 100,
         y: 120,
         image: d.getElementById('img_player'),
-        //color: 'red',
-        //width: tileWidth,
-        //height: tileHeight,
         dx: 0,
         properties: {
             mirror: false,
             grounded: false,
             canLink: DEBUG,
             canPush: DEBUG,
-            canSprint: false,
-            hasKey: DEBUG
+            canSprint: DEBUG,
+            hasKey: false
         },
         render: function(){
             var deltaY = 0;
@@ -249,9 +259,12 @@
     });
 
     d.body.addEventListener('contextmenu', function(e){
-        e.preventDefault();
+        //e.preventDefault();
     });
 
+    /**
+     * Start the game.
+     */
     function initGame() {
         kontra.pointer.onDown(function(e) {
             var angle = Math.atan2(pointer.y - (player.y+player.height/2), pointer.x - (player.x+player.width/2));
@@ -358,7 +371,7 @@
                 renderButtonPrompt();
                 renderGameOverTimer();
 
-                //postProcess();
+                postProcess();
             }
         });
 
@@ -386,8 +399,12 @@
         noAlphaCtx.lineWidth = 2;
         noAlphaCtx.strokeRect(20, 20, 30, 15);
         noAlphaCtx.fillRect(20, 20, Math.round((gameOverTimer/gameOverTime)*30), 15);
-        ctx.drawImage(noAlphaCanvas, 297, 65);
-        ctx.drawImage(d.getElementById('img_clock'), 349, 84);
+        var x = 297;
+        if (worldCoord.x === 1 && worldCoord.y === 1){
+            x = 0
+        }
+        ctx.drawImage(noAlphaCanvas, x, 65);
+        ctx.drawImage(d.getElementById('img_clock'), x+9, 84);
     }
 
     /**
@@ -407,23 +424,25 @@
         }
 
         if (markedSprites.length === 2) {
-            noAlphaCtx.clearRect(0, 0, noAlphaCanvas.width, noAlphaCanvas.height);
-            noAlphaCtx.beginPath();
-            noAlphaCtx.strokeStyle = 'rgba(4, 220, 39, 1)';
-            noAlphaCtx.lineWidth = 2;
-            noAlphaCtx.moveTo(
+            greenCtx.clearRect(0, 0, noAlphaCanvas.width, noAlphaCanvas.height);
+            greenCtx.beginPath();
+            greenCtx.strokeStyle = 'rgba(0, 255, 0, 1)';
+            greenCtx.lineWidth = 2;
+            greenCtx.moveTo(
                 Math.round(markedSprites[0].x + tileWidth/2),
                 Math.round(markedSprites[0].y + tileHeight/2)
             );
-            noAlphaCtx.lineTo(
+            greenCtx.lineTo(
                 Math.round(markedSprites[1].x + tileWidth/2),
                 Math.round(markedSprites[1].y + tileHeight/2)
             );
-            noAlphaCtx.stroke();
-            noAlphaCtx.stroke();
+            greenCtx.stroke();
+            greenCtx.stroke();
+            greenCtx.stroke();
+            greenCtx.stroke();
 
 
-            ctx.drawImage(noAlphaCanvas, 0, 0, noAlphaCanvas.width, noAlphaCanvas.height);
+            ctx.drawImage(greenCanvas, 0, 0, greenCanvas.width, greenCanvas.height);
         }
     }
 
@@ -802,6 +821,16 @@
             level.destructables = [];
         }
 
+        function rndr() {
+            var realX = this.x;
+            var realY = this.y;
+            this.x = Math.round(this.x);
+            this.y = Math.round(this.y);
+            this.draw();
+            this.x = realX;
+            this.y = realY;
+        }
+
         unlinkMarkedSprites();
         tilePool.clear();
         for (var i = 0; i < level.map.length; i++) {
@@ -818,7 +847,8 @@
                         movable: true,
                         destroys: true,
                         canLink: true
-                    }
+                    },
+                    render: rndr
                 });
             }
             else if (level.map[i] === 2) {
@@ -834,7 +864,8 @@
                         movable: false,
                         destroys: false,
                         canLink: true
-                    }
+                    },
+                    render: rndr
                 });
             }
             else if (level.map[i] === 3) {
@@ -850,7 +881,8 @@
                         movable: false,
                         destroys: false,
                         canLink: false
-                    }
+                    },
+                    render: rndr
                 }));
             }
             else if (level.map[i] === 4) {
@@ -870,9 +902,11 @@
                     update: function() {
                         if (player.collidesWith(this) && (player.y > this.y)) {
                             w.playSfx('death');
+                            unlinkMarkedSprites();
                             loadLevel(true);
                         }
-                    }
+                    },
+                    render: rndr
                 });
             }
             else if (level.map[i] === 5) {
@@ -897,7 +931,8 @@
                             }
                             this.ttl = 0;
                         }
-                    }
+                    },
+                    render: rndr
                 });
             }
             else if (level.map[i] === 6 && !player.properties.hasKey) {
@@ -922,13 +957,9 @@
                             }
                             this.ttl = 0;
                             player.properties.hasKey = true;
-                            setButtonPrompt('key', function(){
-                                setTimeout(function(){
-                                    removeButtonPrompt();
-                                }, 3000);
-                            });
                         }
-                    }
+                    },
+                    render: rndr
                 });
             }
             else if (level.map[i] === 7) {
@@ -962,7 +993,8 @@
                                 loadLevelNextUpdatePosition = player;
                             }
                         }
-                    }
+                    },
+                    render: rndr
                 });
             }
             else if (level.map[i] === 9 && !player.properties.canPush) {
@@ -993,7 +1025,8 @@
                         movable: false,
                         destroys: false,
                         played: false
-                    }
+                    },
+                    render: rndr
                 });
             }
             else if (level.map[i] === 10 && !player.properties.canLink) {
@@ -1024,7 +1057,8 @@
                         movable: false,
                         destroys: false,
                         played: false
-                    }
+                    },
+                    render: rndr
                 });
             }
             else if (level.map[i] === 11 && !player.properties.canSprint) {
@@ -1055,7 +1089,8 @@
                         movable: false,
                         destroys: false,
                         played: false
-                    }
+                    },
+                    render: rndr
                 });
             }
             else if (level.map[i] === 12 && !player.properties.extraTime) {
@@ -1083,7 +1118,8 @@
                         movable: false,
                         destroys: false,
                         played: false
-                    }
+                    },
+                    render: rndr
                 });
             }
         }

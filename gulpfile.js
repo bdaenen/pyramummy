@@ -49,12 +49,14 @@
   });
 
   gulp.task('assets', function(){
-    return gulp.src('./src/assets/**')
+    return gulp.src('./src/assets/*.png')
       .pipe(gulp.dest(__dirname + '/build/assets'))
   });
 
   gulp.task('gzip', ['html', 'assets'], function(done){
-    var src = fs.readFileSync('./build/indexmin.html');
+    var src = fs.readFileSync('./build/indexmin.html', 'utf8');
+    // Get rid of all extra script tags and replace them by ';' to fix minified code and save size.
+    src = src.split('</script><script>').join(';');
     var template = fs.readFileSync('./src/index_compressed_template.html', 'utf8');
     var data = zlib.gzipSync(src, {
       level: 9,
@@ -62,7 +64,7 @@
     });
     data = data.toString('base64');
     fs.writeFileSync('./build/index.html', template.replace('{$BUFFER}', data).replace('{$BUFFER_SIZE}', src.length));
-    fs.unlinkSync('./build/indexmin.html');
+  //  fs.unlinkSync('./build/indexmin.html');
     return done();
   });
 
