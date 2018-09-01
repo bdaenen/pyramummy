@@ -44,7 +44,7 @@
         //minifyJS: false
         minifyJS: true
       }))
-      .pipe(rename('index.min.html'))
+      .pipe(rename('indexmin.html'))
       .pipe(gulp.dest(__dirname + '/build'));
   });
 
@@ -54,14 +54,15 @@
   });
 
   gulp.task('gzip', ['html', 'assets'], function(done){
-    var src = fs.readFileSync('./build/index.min.html');
+    var src = fs.readFileSync('./build/indexmin.html');
     var template = fs.readFileSync('./src/index_compressed_template.html', 'utf8');
     var data = zlib.gzipSync(src, {
       level: 9,
       windowBits: 15
     });
     data = data.toString('base64');
-    fs.writeFileSync('./build/index.gzip.html', template.replace('{$BUFFER}', data).replace('{$BUFFER_SIZE}', src.length));
+    fs.writeFileSync('./build/index.html', template.replace('{$BUFFER}', data).replace('{$BUFFER_SIZE}', src.length));
+    fs.unlinkSync('./build/indexmin.html');
     return done();
   });
 

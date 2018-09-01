@@ -1,6 +1,6 @@
 (function() {
     'use strict';
-    var DEBUG = false;
+    var DEBUG = true;
     var canvas = d.createElement('canvas');
     var ctx = canvas.getContext('2d');
     var bgCanvas = d.createElement('canvas');
@@ -12,6 +12,7 @@
     var gameOverTime = 10 * 60;
     var gameOverTimer = gameOverTime;
     var isGameOver = false;
+    var audio;
 
     var musicPlayer = new CPlayer();
     musicPlayer.init(w.song);
@@ -22,16 +23,13 @@
         if (done) {
             clearInterval(soundInterval);
             var wave = musicPlayer.createWave();
-            var audio = d.createElement('audio');
+            audio = d.createElement('audio');
             audio.src = URL.createObjectURL(new Blob([wave], {type: 'audio/wav'}));
             audio.loop = true;
-            audio.volume = 0.2;
-            audio.addEventListener('ended', function() {
-                this.currentTime = 0;
-                this.play();
-            }, false);
-            audio.play();
-            initGame();
+            var context = new w.AudioContext();
+
+            var source = context.createMediaElementSource(audio);
+            source.connect(context.destination);
         }
     }, 250);
 
@@ -69,8 +67,16 @@
     noAlphaCanvas.width = canvas.width;
     noAlphaCanvas.height = canvas.height;
 
-    ctx.fillStyle = 'rgb(113,95,52)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    d.getElementById('img_intro').onload = function(){
+        ctx.drawImage(d.getElementById('img_intro'), 0, 0, 360, 400);
+        canvas.addEventListener('click', function bootGame(){
+            if (audio) {
+               canvas.removeEventListener('click', bootGame);
+               initGame();
+               audio.play(0);
+            }
+        });
+    };
 
     w.tileWidth = 10;
     w.tileHeight = 20;
@@ -115,6 +121,11 @@
         x: w.innerWidth / canvas.width,
         y: w.innerHeight / canvas.height
     };
+
+    w.addEventListener('resize', function(){
+        scale.x = w.innerWidth / canvas.width;
+        scale.y = w.innerHeight / canvas.height;
+    });
 
     var pointer = {
         x: 0,
@@ -732,7 +743,7 @@
             }
             else {
                 transitionPosition = {
-                    x: 300,//80,
+                    x: 80,
                     //++y: 0
                     y: 57
                 };
@@ -1098,21 +1109,27 @@
         sprite2.properties.linkedDelta.y = sprite1.y - sprite1.properties.linkStartPosition.y;
         sprite1.properties.linkedDelta.x = sprite2.x - sprite2.properties.linkStartPosition.x;
         sprite1.properties.linkedDelta.y = sprite2.y - sprite2.properties.linkStartPosition.y;
+
+        sprite1.x = Math.round(sprite1.x + sprite1.properties.linkedDelta.x);
+        sprite2.x = Math.round(sprite2.x + sprite2.properties.linkedDelta.x);
+        sprite1.y = Math.round(sprite1.y + sprite1.properties.linkedDelta.y);
+        sprite2.y = Math.round(sprite2.y + sprite2.properties.linkedDelta.y);
+
+        if (player.properties.groundedTile === sprite1) {
+            player.x = Math.round(player.x + sprite1.properties.linkedDelta.x);
+            player.y = Math.round(player.y + sprite1.properties.linkedDelta.y);
+        }
+        if (player.properties.groundedTile === sprite2) {
+            player.x = Math.round(player.x + sprite2.properties.linkedDelta.x);
+            player.y = Math.round(player.y + sprite2.properties.linkedDelta.y);
+        }
     }
 
     /**
      *
      */
     function linkedSpriteRender() {
-        this.x = Math.round(this.x + this.properties.linkedDelta.x);
-        this.y = Math.round(this.y + this.properties.linkedDelta.y);
         this.draw();
-
-        if (player.properties.groundedTile === this) {
-            player.x = Math.round(player.x + this.properties.linkedDelta.x);
-            player.y = Math.round(player.y + this.properties.linkedDelta.y);
-        }
-
         this.properties.linkStartPosition.x = Math.round(this.x);
         this.properties.linkStartPosition.y = Math.round(this.y);
     }
