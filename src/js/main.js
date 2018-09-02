@@ -1,24 +1,10 @@
 (function() {
     'use strict';
-    var DEBUG = false;
-    if (DEBUG) {
-        kontra.keys.bind('o', function(){
-            worldCoord.y++;
-            loadLevel();
-        });
-        kontra.keys.bind('l', function(){
-            worldCoord.y--;
-            loadLevel();
-        });
-        kontra.keys.bind('m', function(){
-            worldCoord.x++;
-            loadLevel();
-        });
-        kontra.keys.bind('k', function(){
-            worldCoord.x--;
-            loadLevel();
-        });
-    }
+
+    var leftButtonDown = false;
+    var rightButtonDown = false;
+    var firstPassCanvas = d.createElement('canvas');
+    var firstPassCtx = firstPassCanvas.getContext('2d');
     var canvas = d.createElement('canvas');
     var ctx = canvas.getContext('2d');
     var bgCanvas = d.createElement('canvas');
@@ -27,11 +13,12 @@
     var textureCtx = textureCanvas.getContext('2d');
     var noAlphaCanvas = d.createElement('canvas');
     var noAlphaCtx = noAlphaCanvas.getContext('2d');
-   // var greenCanvas = d.createElement('canvas');
-   // var greenCtx = greenCanvas.getContext('2d');
+    var greenCanvas = d.createElement('canvas');
+    var greenCtx = greenCanvas.getContext('2d');
     var gameOverTime = 10 * 60;
     var gameOverTimer = gameOverTime;
     var isGameOver = false;
+    var gameWon = false;
     var audio;
     var buttonPromptCoords;
 
@@ -56,22 +43,12 @@
 
     ctx.imageSmoothingEnabled = false;
     ctx.webkitImageSmoothingEnabled = false;
-    ctx.mozImageSmoothingEnabled = false;
     bgCtx.imageSmoothingEnabled = false;
     bgCtx.webkitImageSmoothingEnabled = false;
-    bgCtx.mozImageSmoothingEnabled = false;
     textureCtx.imageSmoothingEnabled = false;
     textureCtx.webkitImageSmoothingEnabled = false;
-    textureCtx.mozImageSmoothingEnabled = false;
     noAlphaCtx.imageSmoothingEnabled = false;
     noAlphaCtx.webkitImageSmoothingEnabled = false;
-    noAlphaCtx.mozImageSmoothingEnabled = false;
-    window.onload = function(){
-        noAlphaCtx.filter = 'url(#remove-alpha)';
-        //ctx.filter = 'url(#remove-alpha)';
-        //greenCtx.filter = 'url(#remove-alpha)';
-        //ctx.filter = 'url(#remove-alpha)';
-    };
 
     var currentLevel = null;
     var jumpCooldown = 0.2;
@@ -88,20 +65,23 @@
     var markedSprites = [];
     var loadLevelNextUpdate;
     var loadLevelNextUpdatePosition;
+    var shake = false;
 
-    canvas.width = 360;
-    canvas.height = 400;
-    bgCanvas.width = canvas.width;
-    bgCanvas.height = canvas.height;
+    firstPassCanvas.width = 360;
+    firstPassCanvas.height = 400;
+    canvas.width = firstPassCanvas.width;
+    canvas.height = firstPassCanvas.height;
+    bgCanvas.width = firstPassCanvas.width;
+    bgCanvas.height = firstPassCanvas.height;
     noAlphaCanvas.width = canvas.width;
     noAlphaCanvas.height = canvas.height;
-//    greenCanvas.width = canvas.width;
-//    greenCanvas.height = canvas.height;
+    greenCanvas.width = canvas.width;
+    greenCanvas.height = canvas.height;
 
     d.getElementById('img_intro').onload = function(){
         ctx.drawImage(d.getElementById('img_intro'), 0, 0, 360, 400);
         canvas.addEventListener('click', function bootGame(){
-            if (DEBUG || audio) {
+            if (audio) {
                canvas.removeEventListener('click', bootGame);
                initGame();
                audio.play(0);
@@ -118,11 +98,10 @@
     textureCanvas.width = tileWidth;
     textureCanvas.height = tileHeight;
 
-    //var intro = true;
     d.getElementById('img_bg').onload = function(){
-        bgPattern = ctx.createPattern(d.getElementById('img_bg'), 'repeat');
+        bgPattern = firstPassCtx.createPattern(d.getElementById('img_bg'), 'repeat');
         bgCtx.fillStyle = bgPattern;
-        bgCtx.rect(0, 0, canvas.width, canvas.height);
+        bgCtx.rect(0, 0, firstPassCanvas.width, firstPassCanvas.height);
         bgCtx.fill();
     };
     var worldCoord = {
@@ -149,13 +128,13 @@
     };
 
     var scale = {
-        x: w.innerWidth / canvas.width,
-        y: w.innerHeight / canvas.height
+        x: w.innerWidth / firstPassCanvas.width,
+        y: w.innerHeight / firstPassCanvas.height
     };
 
     w.addEventListener('resize', function(){
-        scale.x = w.innerWidth / canvas.width;
-        scale.y = w.innerHeight / canvas.height;
+        scale.x = w.innerWidth / firstPassCanvas.width;
+        scale.y = w.innerHeight / firstPassCanvas.height;
     });
 
     var pointer = {
@@ -175,7 +154,7 @@
 
     $('.c').appendChild(canvas);
 
-    kontra.init();
+    kontra.init(firstPassCanvas);
 
     var minimap = kontra.sprite({
        x: 305,
@@ -234,9 +213,9 @@
         properties: {
             mirror: false,
             grounded: false,
-            canLink: DEBUG,
-            canPush: DEBUG,
-            canSprint: DEBUG,
+            canLink: false,
+            canPush: false,
+            canSprint: false,
             hasKey: false
         },
         render: function(){
@@ -265,7 +244,7 @@
     });
 
     d.body.addEventListener('contextmenu', function(e){
-        //e.preventDefault();
+        e.preventDefault();
     });
 
     /**
@@ -332,6 +311,9 @@
 
         var loop = kontra.gameLoop({
             update: function(dt) {
+                if (isGameOver || gameWon) {
+                    return;
+                }
                 gameOverTimer -= dt;
                 if (gameOverTimer <= 0) {
                     isGameOver = true;
@@ -347,16 +329,21 @@
                 buttonPrompt && buttonPromptUpdate && buttonPromptUpdate();
             },
             render: function() {
-                /*if (intro) {
-                    return renderIntro();
-                }*/
+                //countColors();
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                firstPassCtx.fillStyle = '#000000';
+                firstPassCtx.fillRect(0, 0, firstPassCanvas.width, firstPassCanvas.height);
 
+                if (gameWon) {
+                    return renderGameWon();
+                }
                 if (isGameOver) {
                     return renderGameOver();
                 }
 
                 // BG
-                ctx.drawImage(bgCanvas, 0, 0);
+                firstPassCtx.drawImage(bgCanvas, 0, 0);
                 tilePool.render();
                 renderMarkedSprites();
                 player.render();
@@ -377,7 +364,16 @@
                 renderButtonPrompt();
                 renderGameOverTimer();
 
-                postProcess();
+                if (shake) {
+                    preShake(ctx);
+                    if (!w.sfxIsPlaying('death')) {
+                        w.playSfx('death');
+                    }
+                }
+                ctx.drawImage(firstPassCanvas, 0, 0);
+                if (shake) {
+                    postShake(ctx);
+                }
             }
         });
 
@@ -391,8 +387,16 @@
      */
     function renderGameOver() {
         ctx.fillStyle = '#000000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillRect(0, 0, firstPassCanvas.width, firstPassCanvas.height);
         ctx.drawImage(d.getElementById('img_game_over'), 0, 0);
+    }
+
+    /**
+     * Hurray!
+     */
+    function renderGameWon() {
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(d.getElementById('img_win'), 10, 10);
     }
 
     /**
@@ -409,8 +413,8 @@
         if (worldCoord.x === 1 && worldCoord.y === 1){
             x = 0
         }
-        ctx.drawImage(noAlphaCanvas, x, 65);
-        ctx.drawImage(d.getElementById('img_clock'), x+9, 84);
+        firstPassCtx.drawImage(noAlphaCanvas, x, 65);
+        firstPassCtx.drawImage(d.getElementById('img_clock'), x+9, 84);
     }
 
     /**
@@ -421,46 +425,37 @@
             for (y=0; y < markedSprites.length; y++) {
                 textureCtx.save();
                 textureCtx.clearRect(0, 0, textureCanvas.width, textureCanvas.height);
-                textureCtx.fillStyle = '#04dc27';
-                textureCtx.fillRect(0, 0, tileWidth, tileHeight);
-                textureCtx.drawImage(markedSprites[y].image, 1, 1, tileWidth-2, tileHeight-2, 1, 1, tileWidth-2, tileHeight-2);
+                textureCtx.strokeStyle = '#04dc27';
+                textureCtx.strokeRect(0, 0, tileWidth, tileHeight);
                 textureCtx.restore();
-                ctx.drawImage(textureCanvas, markedSprites[y].x, markedSprites[y].y);
+                flattenLines(textureCtx);
+                firstPassCtx.drawImage(textureCanvas, markedSprites[y].x, markedSprites[y].y);
             }
         }
 
         if (markedSprites.length === 2) {
-            noAlphaCtx.clearRect(0, 0, noAlphaCanvas.width, noAlphaCanvas.height);
-            noAlphaCtx.beginPath();
-            noAlphaCtx.strokeStyle = 'rgba(0, 255, 0, 1)';
-            noAlphaCtx.lineWidth = 2;
-            noAlphaCtx.moveTo(
+            greenCtx.clearRect(0, 0, greenCanvas.width, greenCanvas.height);
+            greenCtx.beginPath();
+            greenCtx.strokeStyle = 'rgba(0, 255, 0, 1)';
+            greenCtx.lineWidth = 2;
+            greenCtx.moveTo(
                 Math.round(markedSprites[0].x + tileWidth/2),
                 Math.round(markedSprites[0].y + tileHeight/2)
             );
-            noAlphaCtx.lineTo(
+            greenCtx.lineTo(
                 Math.round(markedSprites[1].x + tileWidth/2),
                 Math.round(markedSprites[1].y + tileHeight/2)
             );
-            noAlphaCtx.lineTo(
+            greenCtx.lineTo(
                 Math.round(markedSprites[0].x + tileWidth/2),
                 Math.round(markedSprites[0].y + tileHeight/2)
             );
 
-            // "Hack" to clear all remnants of AA.
-            for (var i = 0; i < 20; i++) {
-                noAlphaCtx.stroke();
-            }
-
-            ctx.drawImage(noAlphaCanvas, 0, 0, noAlphaCanvas.width, noAlphaCanvas.height);
+            greenCtx.stroke();
+            flattenLines(greenCtx);
+            firstPassCtx.drawImage(greenCanvas, 0, 0, greenCanvas.width, greenCanvas.height);
         }
     }
-
-    /*canvas.onclick = function() {
-      if (!document.pointerLockElement) {
-        canvas.requestPointerLock();
-      }
-    };*/
 
     /**
      * @param dt
@@ -552,7 +547,10 @@
             }
         }
         else if (player.y < (player.height/2)) {
-            if (w['level' + worldCoord.x + '_' + (worldCoord.y+1)]) {
+            if (worldCoord.x === 3 && worldCoord.y === 3) {
+                return gameWon = true;
+            }
+            else if (w['level' + worldCoord.x + '_' + (worldCoord.y+1)]) {
                 worldCoord.y++;
                 loadLevel();
             }
@@ -641,7 +639,7 @@
                         levelSprite.ddy = -bullet.dy/10;
                     }
                 }
-                if (levelSprite.properties.index <= 5) {
+                if (levelSprite.properties.collides) {
                     bulletPool.clear();
                     bullet = null;
                 }
@@ -872,7 +870,7 @@
                         index: level.map[i],
                         collides: true,
                         movable: false,
-                        destroys: false,
+                        destroys: true,
                         canLink: true
                     },
                     render: rndr
@@ -1007,6 +1005,63 @@
                     render: rndr
                 });
             }
+            else if (level.map[i] === 13) {
+                var btnDown = (worldCoord.x === 2 && worldCoord.y === 2) ? leftButtonDown : rightButtonDown;
+                tilePool.get({
+                    x: tileWidth*(i%level.width),
+                    y: tileHeight*Math.floor(i/level.width),
+                    image: btnDown ? d.getElementById('img_button_down') : d.getElementById('img_button'),
+                    dx: 0,
+                    ttl: Infinity,
+                    properties: {
+                        index: level.map[i],
+                        collides: false,
+                        movable: false,
+                        destroys: false,
+                        canLink: false,
+                        down: btnDown
+                    },
+                    update: function() {
+                        if (player.collidesWith(this)) {
+                            if (!this.properties.down) {
+                                w.playSfx('hit');
+                                this.properties.down = true;
+                                (worldCoord.x === 2 && worldCoord.y === 2) ? (leftButtonDown = true) : (rightButtonDown = true);
+
+                                if (leftButtonDown && rightButtonDown) {
+                                    shake = true;
+                                    setTimeout(function(){
+                                        shake = false;
+                                    }, 3000)
+                                }
+                            }
+                        }
+                    },
+                    render: function(){
+                        if (this.properties.down) {
+                            this.image = d.getElementById('img_button_down')
+                        }
+                        rndr.call(this);
+                    }
+                });
+            }
+            else if (level.map[i] === 8 && leftButtonDown && rightButtonDown) {
+                tilePool.get({
+                    x: tileWidth*(i%level.width),
+                    y: tileHeight*Math.floor(i/level.width),
+                    image: d.getElementById('img_wall_hard'),
+                    dx: 0,
+                    ttl: Infinity,
+                    properties: {
+                        index: level.map[i],
+                        collides: true,
+                        movable: false,
+                        destroys: false,
+                        canLink: true
+                    },
+                    render: rndr
+                });
+            }
             else if (level.map[i] === 9 && !player.properties.canPush) {
                 tilePool.get({
                     x: tileWidth*(i%level.width) - tileWidth/2,
@@ -1026,7 +1081,7 @@
                                 if (kontra.pointer.pressed('left')) {
                                     removeButtonPrompt();
                                 }
-                            })
+                            }, canvas.width/2, canvas.height/2+20);
                         }
                     },
                     properties: {
@@ -1118,8 +1173,8 @@
                             }
                             this.ttl = 0;
                             player.properties.extraTime = true;
-                            gameOverTime += 5 * 60;
-                            gameOverTimer += 5 * 60;
+                            gameOverTime += (5 * 60);
+                            gameOverTimer += (5 * 60);
                         }
                     },
                     properties: {
@@ -1309,7 +1364,7 @@
      */
     function renderButtonPrompt() {
         if (buttonPrompt) {
-            ctx.drawImage(d.getElementById('img_button_' + buttonPrompt), buttonPromptCoords.x, buttonPromptCoords.y);
+            firstPassCtx.drawImage(d.getElementById('img_button_' + buttonPrompt), buttonPromptCoords.x, buttonPromptCoords.y);
         }
     }
 
@@ -1327,8 +1382,8 @@
         }
         else {
             buttonPromptCoords = {
-                x: canvas.width/2,
-                y: canvas.height/2
+                x: firstPassCanvas.width/2,
+                y: firstPassCanvas.height/2
             }
         }
         buttonPrompt = button;
@@ -1346,19 +1401,35 @@
     /**
      * Flatten the image to 32 colors.
      */
-    function postProcess() {
-        var imgData = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
+    function flattenLines(greenCtx) {
+        // load all pixels into an array
+        var imageData=greenCtx.getImageData(0,0,firstPassCanvas.width,firstPassCanvas.height);
+        var data=imageData.data;
+
+        for(var i=0; i<data.length; i+=4) {
+            if(data[i+3]>0){
+                data[i]   = 0;
+                data[i+1] = 255;
+                data[i+2] = 0;
+                data[i+3] = 255;
+            }
+        }
+        greenCtx.putImageData(imageData, 0, 0);
+    }
+
+    function countColors() {
+        var imgData = firstPassCtx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
         var colors = {};
         var r, g, b, a;
         var key;
 
         for (var i = 0; i < imgData.data.length; i += 4) {
             r = imgData.data[i];
-            g = imgData.data[i+1];
-            b = imgData.data[i+2];
-            key = (r   << 16) |
-                (g << 8) |
-                (b <<  4);
+            g = imgData.data[i + 1];
+            b = imgData.data[i + 2];
+            key = (r << 16) |
+              (g << 8) |
+              (b << 4);
             //console.log(key.toString(16));
             colors[key] = colors[key] || 1;
             colors[key]++;
@@ -1368,6 +1439,17 @@
             console.log(colors);
             alert('TOO MANY COLORS! GOT ' + Object.keys(colors).length);
         }
-        //this.ctx.putImageData(imgData, 0, 0);
     }
+
+    function preShake(ctx) {
+        ctx.save();
+        var dx = Math.round(Math.random());
+        var dy = Math.round(Math.random());
+        ctx.translate(dx, dy);
+    }
+
+    function postShake(ctx) {
+        ctx.restore();
+    }
+
 }());

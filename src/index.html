@@ -12,10 +12,10 @@
 <img id="img_wall_hard" width="10" height="20" style="position: absolute; opacity: 0;" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAUCAMAAACDMFxkAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAABJQTFRFRTUJ47Epw5YapX8Wel4QY0wN3shZDgAAADlJREFUeNqUjTESADAIwmiF/3+5WhbPzUxZIEAjDFPv+cRWzVCKlCiMGJ2Ex3WzUr9XpKtDlXwCDAB06gEt5qr/yAAAAABJRU5ErkJggg=="/>
 <img id="img_wall" width="10" height="20" style="position: absolute; opacity: 0;" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAUCAIAAAA7jDsBAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAFVJREFUeNpidDXlZMANWIA4wYsXU+Lq/V+nr/9kYsALQLrlxFkUpPkxpN4S1j0qTY40C4R68PQjubq3n/j28t1fcSFmIBvIAJJANoRBQDcj/sQEEGAAs6YZP9/jbBkAAAAASUVORK5CYII="/>
 <img id="img_destruct" src="assets/destruct.png" width="10" height="20" style="position: absolute; opacity: 0;"/>
-<img id="img_bg" src="assets/wall_bg.png" width="10" height="20" style="position: absolute; opacity: 0;"/>
-<img id="img_button_click" src="assets/click.png" width="69" height="274" style="position: absolute; opacity: 0;"/>
-<img id="img_button_rightclick" src="assets/rclick.png" width="69" height="274" style="position: absolute; opacity: 0;"/>
-<img id="img_button_shift" src="assets/shift.png" width="69" height="274" style="position: absolute; opacity: 0;"/>
+<img id="img_bg" src="assets/wall_bg.png" width="20" height="32" style="position: absolute; opacity: 0;"/>
+<img id="img_button_click" src="assets/click.png" width="69" height="188" style="position: absolute; opacity: 0;"/>
+<img id="img_button_rightclick" src="assets/rclick.png" width="69" height="200" style="position: absolute; opacity: 0;"/>
+<img id="img_button_shift" src="assets/shift.png" width="33" height="46" style="position: absolute; opacity: 0;"/>
 <img id="img_spike" width="9" height="9" style="position: absolute; opacity: 0;" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAkAAAAUCAMAAABoB+dnAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAAZQTFRF//zcAAAAoOWpfgAAAAJ0Uk5T/wDltzBKAAAAI0lEQVR42mJghAEGerGwEAwMDOgsBgYwE5nFAAHILDgACDAAQjsAjJuBwYoAAAAASUVORK5CYII="/>
 <img id="img_game_over" src="assets/gameover.png" width="360" height="400" style="position: absolute; opacity: 0;"/>
 <img id="img_clock" width="10" height="20" style="position: absolute; opacity: 0;" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAUCAMAAACDMFxkAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAAlQTFRF///MAAAA////52QwgAAAAAN0Uk5T//8A18oNQQAAADpJREFUeNpiYGJiYgQCIMUAZDEAASNuJojFCGLjYEJUgjF2Jpo2MA/OZGQE28aI3w3I7oUB7EyAAAMAS/oAzpzg48sAAAAASUVORK5CYII="/>
@@ -23,15 +23,9 @@
 <img id="img_key" src="assets/key.png" width="10" height="20" style="position: absolute; opacity: 0;"/>
 <img id="img_keyhole" src="assets/wallkey.png" width="10" height="20" style="position: absolute; opacity: 0;"/>
 <img id="img_portal" src="assets/portal.png" width="10" height="20" style="position: absolute; opacity: 0;"/>
-<svg width="0" height="0" style="position:absolute;z-index:-1;">
-    <defs>
-        <filter id="remove-alpha" x="0" y="0" width="100%" height="100%">
-            <feComponentTransfer>
-                <feFuncA type="discrete" tableValues="0 1"></feFuncA>
-            </feComponentTransfer>
-        </filter>
-    </defs>
-</svg>
+<img id="img_button" src="assets/button.png" width="10" height="4" style="position: absolute; opacity: 0;"/>
+<img id="img_button_down" src="assets/button2.png" width="10" height="4" style="position: absolute; opacity: 0;"/>
+<img id="img_win" src="assets/win.png" width="338" height="376" style="position: absolute; opacity: 0;"/>
 <script>
   var d=document,w=window;w.$ = d.querySelector.bind(d);
   w.$$ = d.querySelectorAll.bind(d);
@@ -58,6 +52,10 @@
 <script inline src="js/lvls/lvl3_1.js"></script>
 <script inline src="js/lvls/lvl4_1.js"></script>
 <script inline src="js/lvls/lvl5_1.js"></script>
+<script inline src="js/lvls/lvl2_2.js"></script>
+<script inline src="js/lvls/lvl3_2.js"></script>
+<script inline src="js/lvls/lvl4_2.js"></script>
+<script inline src="js/lvls/lvl3_3.js"></script>
 <script inline src="js/sfx.js"></script>
 <script inline src="js/song.js"></script>
 <script inline src="js/main.js"></script>
