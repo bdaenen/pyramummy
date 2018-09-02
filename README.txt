@@ -34,3 +34,10 @@ Known bugs
 - Very rarely the background layer does not show up. Refresh to fix.
 - Very rarely linked block movement is not consistent. Reset the link (space) or reset the room (R) to fix.
 - You can probably find some ways to sequence-break or really break the game by using its unique mechanic :)
+
+
+Special thanks
+---------------
+rpp0 (https://github.com/rpp0) for lending his musical talent!
+Tatiana for creating an awesome victory screen and being very supportive and patient
+Gynvael for organising a game jam / dev challenge that I can actually participate in, being a father. We need more longer game jams! :)

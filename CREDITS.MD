@@ -9,4 +9,4 @@ This game submission makes use of multiple open source projects. It would not ha
 
  Huge shoutout to [rpp0](https://github.com/rpp0) for lending his musical talent!
 
-All licenses for redistributed source code can be found in the licenses folder.
+All licenses for redistributed source code can be found in the LICENSES directory.
