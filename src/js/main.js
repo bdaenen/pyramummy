@@ -1,6 +1,6 @@
 (function() {
     'use strict';
-    var DEBUG = true;
+    var DEBUG = false;
     if (DEBUG) {
         kontra.keys.bind('o', function(){
             worldCoord.y++;
@@ -27,8 +27,8 @@
     var textureCtx = textureCanvas.getContext('2d');
     var noAlphaCanvas = d.createElement('canvas');
     var noAlphaCtx = noAlphaCanvas.getContext('2d');
-    var greenCanvas = d.createElement('canvas');
-    var greenCtx = greenCanvas.getContext('2d');
+   // var greenCanvas = d.createElement('canvas');
+   // var greenCtx = greenCanvas.getContext('2d');
     var gameOverTime = 10 * 60;
     var gameOverTimer = gameOverTime;
     var isGameOver = false;
@@ -56,15 +56,20 @@
 
     ctx.imageSmoothingEnabled = false;
     ctx.webkitImageSmoothingEnabled = false;
+    ctx.mozImageSmoothingEnabled = false;
     bgCtx.imageSmoothingEnabled = false;
     bgCtx.webkitImageSmoothingEnabled = false;
+    bgCtx.mozImageSmoothingEnabled = false;
     textureCtx.imageSmoothingEnabled = false;
     textureCtx.webkitImageSmoothingEnabled = false;
+    textureCtx.mozImageSmoothingEnabled = false;
     noAlphaCtx.imageSmoothingEnabled = false;
     noAlphaCtx.webkitImageSmoothingEnabled = false;
+    noAlphaCtx.mozImageSmoothingEnabled = false;
     window.onload = function(){
         noAlphaCtx.filter = 'url(#remove-alpha)';
-        greenCanvas.filter = 'url(#only-green)';
+        //ctx.filter = 'url(#remove-alpha)';
+        //greenCtx.filter = 'url(#remove-alpha)';
         //ctx.filter = 'url(#remove-alpha)';
     };
 
@@ -90,8 +95,8 @@
     bgCanvas.height = canvas.height;
     noAlphaCanvas.width = canvas.width;
     noAlphaCanvas.height = canvas.height;
-    greenCanvas.width = canvas.width;
-    greenCanvas.height = canvas.height;
+//    greenCanvas.width = canvas.width;
+//    greenCanvas.height = canvas.height;
 
     d.getElementById('img_intro').onload = function(){
         ctx.drawImage(d.getElementById('img_intro'), 0, 0, 360, 400);
@@ -246,13 +251,14 @@
                 }
             }
             this.context.save();
-            this.context.translate(this.x, this.y);
+            this.context.translate(Math.round(this.x), Math.round(this.y));
             if (this.properties.mirror) {
                 this.context.scale(-1, 1);
             }
             else {
                 this.context.scale(1, 1);
             }
+
             this.context.drawImage(this.image, this.properties.mirror ? -7: 0, deltaY);
             this.context.restore();
         }
@@ -424,25 +430,29 @@
         }
 
         if (markedSprites.length === 2) {
-            greenCtx.clearRect(0, 0, noAlphaCanvas.width, noAlphaCanvas.height);
-            greenCtx.beginPath();
-            greenCtx.strokeStyle = 'rgba(0, 255, 0, 1)';
-            greenCtx.lineWidth = 2;
-            greenCtx.moveTo(
+            noAlphaCtx.clearRect(0, 0, noAlphaCanvas.width, noAlphaCanvas.height);
+            noAlphaCtx.beginPath();
+            noAlphaCtx.strokeStyle = 'rgba(0, 255, 0, 1)';
+            noAlphaCtx.lineWidth = 2;
+            noAlphaCtx.moveTo(
                 Math.round(markedSprites[0].x + tileWidth/2),
                 Math.round(markedSprites[0].y + tileHeight/2)
             );
-            greenCtx.lineTo(
+            noAlphaCtx.lineTo(
                 Math.round(markedSprites[1].x + tileWidth/2),
                 Math.round(markedSprites[1].y + tileHeight/2)
             );
-            greenCtx.stroke();
-            greenCtx.stroke();
-            greenCtx.stroke();
-            greenCtx.stroke();
+            noAlphaCtx.lineTo(
+                Math.round(markedSprites[0].x + tileWidth/2),
+                Math.round(markedSprites[0].y + tileHeight/2)
+            );
 
+            // "Hack" to clear all remnants of AA.
+            for (var i = 0; i < 20; i++) {
+                noAlphaCtx.stroke();
+            }
 
-            ctx.drawImage(greenCanvas, 0, 0, greenCanvas.width, greenCanvas.height);
+            ctx.drawImage(noAlphaCanvas, 0, 0, noAlphaCanvas.width, noAlphaCanvas.height);
         }
     }
 
