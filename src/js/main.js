@@ -1,6 +1,10 @@
 (function() {
     'use strict';
-    var DEBUG = true;
+
+    var leftButtonDown = false;
+    var rightButtonDown = false;
+    var firstPassCanvas = d.createElement('canvas');
+    var firstPassCtx = firstPassCanvas.getContext('2d');
     var canvas = d.createElement('canvas');
     var ctx = canvas.getContext('2d');
     var bgCanvas = d.createElement('canvas');
@@ -9,10 +13,14 @@
     var textureCtx = textureCanvas.getContext('2d');
     var noAlphaCanvas = d.createElement('canvas');
     var noAlphaCtx = noAlphaCanvas.getContext('2d');
+    var greenCanvas = d.createElement('canvas');
+    var greenCtx = greenCanvas.getContext('2d');
     var gameOverTime = 10 * 60;
     var gameOverTimer = gameOverTime;
     var isGameOver = false;
+    var gameWon = false;
     var audio;
+    var buttonPromptCoords;
 
     var musicPlayer = new CPlayer();
     musicPlayer.init(w.song);
@@ -40,10 +48,6 @@
     textureCtx.webkitImageSmoothingEnabled = false;
     noAlphaCtx.imageSmoothingEnabled = false;
     noAlphaCtx.webkitImageSmoothingEnabled = false;
-    window.onload = function(){
-        noAlphaCtx.filter = 'url(#remove-alpha)';
-        //ctx.filter = 'url(#remove-alpha)';
-    };
 
     var currentLevel = null;
     var jumpCooldown = 0.2;
@@ -58,13 +62,20 @@
     var buttonPrompt = null;
     var buttonPromptUpdate = null;
     var markedSprites = [];
+    var loadLevelNextUpdate;
+    var loadLevelNextUpdatePosition;
+    var shake = false;
 
-    canvas.width = 360;
-    canvas.height = 400;
-    bgCanvas.width = canvas.width;
-    bgCanvas.height = canvas.height;
+    firstPassCanvas.width = 360;
+    firstPassCanvas.height = 400;
+    canvas.width = firstPassCanvas.width;
+    canvas.height = firstPassCanvas.height;
+    bgCanvas.width = firstPassCanvas.width;
+    bgCanvas.height = firstPassCanvas.height;
     noAlphaCanvas.width = canvas.width;
     noAlphaCanvas.height = canvas.height;
+    greenCanvas.width = canvas.width;
+    greenCanvas.height = canvas.height;
 
     d.getElementById('img_intro').onload = function(){
         ctx.drawImage(d.getElementById('img_intro'), 0, 0, 360, 400);
@@ -86,11 +97,10 @@
     textureCanvas.width = tileWidth;
     textureCanvas.height = tileHeight;
 
-    //var intro = true;
     d.getElementById('img_bg').onload = function(){
-        bgPattern = ctx.createPattern(d.getElementById('img_bg'), 'repeat');
+        bgPattern = firstPassCtx.createPattern(d.getElementById('img_bg'), 'repeat');
         bgCtx.fillStyle = bgPattern;
-        bgCtx.rect(0, 0, canvas.width, canvas.height);
+        bgCtx.rect(0, 0, firstPassCanvas.width, firstPassCanvas.height);
         bgCtx.fill();
     };
     var worldCoord = {
@@ -117,13 +127,13 @@
     };
 
     var scale = {
-        x: w.innerWidth / canvas.width,
-        y: w.innerHeight / canvas.height
+        x: w.innerWidth / firstPassCanvas.width,
+        y: w.innerHeight / firstPassCanvas.height
     };
 
     w.addEventListener('resize', function(){
-        scale.x = w.innerWidth / canvas.width;
-        scale.y = w.innerHeight / canvas.height;
+        scale.x = w.innerWidth / firstPassCanvas.width;
+        scale.y = w.innerHeight / firstPassCanvas.height;
     });
 
     var pointer = {
@@ -143,7 +153,7 @@
 
     $('.c').appendChild(canvas);
 
-    kontra.init();
+    kontra.init(firstPassCanvas);
 
     var minimap = kontra.sprite({
        x: 305,
@@ -174,13 +184,21 @@
                     currentLevel: false
                 },
                 render: function(){
+                    if (worldCoord.x === 1 && worldCoord.y === 1) {
+                        var oldX = this.x;
+                        this.x -= 295;
+                    }
                     if (this.properties.currentLevel) {
-                        this.color = '#1d86df'
+                        this.color = '#33beff'
                     }
                     else if (this.properties.visited) {
                         this.color = '#dfab1d'
                     }
-                    this._draw();
+                    this.draw();
+
+                    if (worldCoord.x === 1 && worldCoord.y === 1) {
+                        this.x = oldX;
+                    }
                 }
             });
         }
@@ -190,16 +208,14 @@
         x: 100,
         y: 120,
         image: d.getElementById('img_player'),
-        //color: 'red',
-        //width: tileWidth,
-        //height: tileHeight,
         dx: 0,
         properties: {
             mirror: false,
             grounded: false,
-            canLink: DEBUG,
-            canPush: DEBUG,
-            canSprint: DEBUG
+            canLink: false,
+            canPush: false,
+            canSprint: false,
+            hasKey: false
         },
         render: function(){
             var deltaY = 0;
@@ -213,26 +229,26 @@
                 }
             }
             this.context.save();
-            this.context.translate(this.x, this.y);
+            this.context.translate(Math.round(this.x), Math.round(this.y));
             if (this.properties.mirror) {
                 this.context.scale(-1, 1);
             }
             else {
                 this.context.scale(1, 1);
             }
+
             this.context.drawImage(this.image, this.properties.mirror ? -7: 0, deltaY);
             this.context.restore();
         }
     });
 
-
-    var bullet = null;
-
     d.body.addEventListener('contextmenu', function(e){
         e.preventDefault();
     });
 
-
+    /**
+     * Start the game.
+     */
     function initGame() {
         kontra.pointer.onDown(function(e) {
             var angle = Math.atan2(pointer.y - (player.y+player.height/2), pointer.x - (player.x+player.width/2));
@@ -294,6 +310,9 @@
 
         var loop = kontra.gameLoop({
             update: function(dt) {
+                if (isGameOver || gameWon) {
+                    return;
+                }
                 gameOverTimer -= dt;
                 if (gameOverTimer <= 0) {
                     isGameOver = true;
@@ -309,16 +328,21 @@
                 buttonPrompt && buttonPromptUpdate && buttonPromptUpdate();
             },
             render: function() {
-                /*if (intro) {
-                    return renderIntro();
-                }*/
+                //countColors();
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                firstPassCtx.fillStyle = '#000000';
+                firstPassCtx.fillRect(0, 0, firstPassCanvas.width, firstPassCanvas.height);
 
+                if (gameWon) {
+                    return renderGameWon();
+                }
                 if (isGameOver) {
                     return renderGameOver();
                 }
 
                 // BG
-                ctx.drawImage(bgCanvas, 0, 0);
+                firstPassCtx.drawImage(bgCanvas, 0, 0);
                 tilePool.render();
                 renderMarkedSprites();
                 player.render();
@@ -339,7 +363,16 @@
                 renderButtonPrompt();
                 renderGameOverTimer();
 
-                //postProcess();
+                if (shake) {
+                    preShake(ctx);
+                    if (!w.sfxIsPlaying('death')) {
+                        w.playSfx('death');
+                    }
+                }
+                ctx.drawImage(firstPassCanvas, 0, 0);
+                if (shake) {
+                    postShake(ctx);
+                }
             }
         });
 
@@ -353,8 +386,16 @@
      */
     function renderGameOver() {
         ctx.fillStyle = '#000000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillRect(0, 0, firstPassCanvas.width, firstPassCanvas.height);
         ctx.drawImage(d.getElementById('img_game_over'), 0, 0);
+    }
+
+    /**
+     * Hurray!
+     */
+    function renderGameWon() {
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(d.getElementById('img_win'), 10, 10);
     }
 
     /**
@@ -367,8 +408,12 @@
         noAlphaCtx.lineWidth = 2;
         noAlphaCtx.strokeRect(20, 20, 30, 15);
         noAlphaCtx.fillRect(20, 20, Math.round((gameOverTimer/gameOverTime)*30), 15);
-        ctx.drawImage(noAlphaCanvas, 297, 65);
-        ctx.drawImage(d.getElementById('img_clock'), 349, 84);
+        var x = 297;
+        if (worldCoord.x === 1 && worldCoord.y === 1){
+            x = 0
+        }
+        firstPassCtx.drawImage(noAlphaCanvas, x, 65);
+        firstPassCtx.drawImage(d.getElementById('img_clock'), x+9, 84);
     }
 
     /**
@@ -379,40 +424,37 @@
             for (y=0; y < markedSprites.length; y++) {
                 textureCtx.save();
                 textureCtx.clearRect(0, 0, textureCanvas.width, textureCanvas.height);
-                textureCtx.fillStyle = '#04dc27';
-                textureCtx.fillRect(0, 0, tileWidth, tileHeight);
-                textureCtx.drawImage(markedSprites[y].image, 1, 1, tileWidth-2, tileHeight-2, 1, 1, tileWidth-2, tileHeight-2);
+                textureCtx.strokeStyle = '#04dc27';
+                textureCtx.strokeRect(0, 0, tileWidth, tileHeight);
                 textureCtx.restore();
-                ctx.drawImage(textureCanvas, markedSprites[y].x, markedSprites[y].y);
+                flattenLines(textureCtx);
+                firstPassCtx.drawImage(textureCanvas, markedSprites[y].x, markedSprites[y].y);
             }
         }
 
         if (markedSprites.length === 2) {
-            noAlphaCtx.clearRect(0, 0, noAlphaCanvas.width, noAlphaCanvas.height);
-            noAlphaCtx.beginPath();
-            noAlphaCtx.strokeStyle = 'rgba(4, 220, 39, 1)';
-            noAlphaCtx.lineWidth = 2;
-            noAlphaCtx.moveTo(
+            greenCtx.clearRect(0, 0, greenCanvas.width, greenCanvas.height);
+            greenCtx.beginPath();
+            greenCtx.strokeStyle = 'rgba(0, 255, 0, 1)';
+            greenCtx.lineWidth = 2;
+            greenCtx.moveTo(
                 Math.round(markedSprites[0].x + tileWidth/2),
                 Math.round(markedSprites[0].y + tileHeight/2)
             );
-            noAlphaCtx.lineTo(
+            greenCtx.lineTo(
                 Math.round(markedSprites[1].x + tileWidth/2),
                 Math.round(markedSprites[1].y + tileHeight/2)
             );
-            noAlphaCtx.stroke();
-            noAlphaCtx.stroke();
+            greenCtx.lineTo(
+                Math.round(markedSprites[0].x + tileWidth/2),
+                Math.round(markedSprites[0].y + tileHeight/2)
+            );
 
-
-            ctx.drawImage(noAlphaCanvas, 0, 0, noAlphaCanvas.width, noAlphaCanvas.height);
+            greenCtx.stroke();
+            flattenLines(greenCtx);
+            firstPassCtx.drawImage(greenCanvas, 0, 0, greenCanvas.width, greenCanvas.height);
         }
     }
-
-    /*canvas.onclick = function() {
-      if (!document.pointerLockElement) {
-        canvas.requestPointerLock();
-      }
-    };*/
 
     /**
      * @param dt
@@ -485,9 +527,7 @@
             loadLevel(true);
         }
 
-        debugger;
         if (player.x > currentLevel.width * tileWidth - (player.width/2)) {
-            debugger;
             if (w['level' + (worldCoord.x+1) + '_' + worldCoord.y]) {
                 worldCoord.x++;
                 loadLevel();
@@ -506,7 +546,10 @@
             }
         }
         else if (player.y < (player.height/2)) {
-            if (w['level' + worldCoord.x + '_' + (worldCoord.y+1)]) {
+            if (worldCoord.x === 3 && worldCoord.y === 3) {
+                return gameWon = true;
+            }
+            else if (w['level' + worldCoord.x + '_' + (worldCoord.y+1)]) {
                 worldCoord.y++;
                 loadLevel();
             }
@@ -574,7 +617,7 @@
             if (bullet && levelSprite.properties.collides && bullet.collidesWith(levelSprite)) {
                 if (bullet.properties.type === 1) {
                     // Don't handle the same sprite twice
-                    if (!markedSprites.length || markedSprites[0] !== levelSprite && levelSprite.properties.canLink) {
+                    if ((!markedSprites.length || markedSprites[0] !== levelSprite) && levelSprite.properties.canLink) {
                         markedSprites.push(levelSprite);
                         levelSprite.properties.marked = 1;
                         levelSprite.properties.originalColor = levelSprite.color;
@@ -595,7 +638,7 @@
                         levelSprite.ddy = -bullet.dy/10;
                     }
                 }
-                if (levelSprite.properties.index <= 5) {
+                if (levelSprite.properties.collides) {
                     bulletPool.clear();
                     bullet = null;
                 }
@@ -631,6 +674,12 @@
                     }
                 }
             }
+        }
+
+        if (loadLevelNextUpdate) {
+            loadLevel(loadLevelNextUpdatePosition);
+            loadLevelNextUpdate = false;
+            loadLevelNextUpdatePosition = false;
         }
     }
 
@@ -743,9 +792,14 @@
             else {
                 transitionPosition = {
                     x: 80,
-                    //++y: 0
                     y: 57
                 };
+            }
+        }
+        else if (previousPosition.x && previousPosition.y) {
+            transitionPosition = {
+                x: previousPosition.x,
+                y: previousPosition.y
             }
         }
         else {
@@ -774,6 +828,16 @@
             level.destructables = [];
         }
 
+        function rndr() {
+            var realX = this.x;
+            var realY = this.y;
+            this.x = Math.round(this.x);
+            this.y = Math.round(this.y);
+            this.draw();
+            this.x = realX;
+            this.y = realY;
+        }
+
         unlinkMarkedSprites();
         tilePool.clear();
         for (var i = 0; i < level.map.length; i++) {
@@ -781,10 +845,7 @@
                 tilePool.get({
                     x: tileWidth*(i%level.width),
                     y: tileHeight*Math.floor(i/level.width),
-                    //color: 'midnightblue',
                     image: d.getElementById('img_wall'),
-                    //width: tileWidth,
-                    //height: tileHeight,
                     dx: 0,
                     ttl: Infinity,
                     properties: {
@@ -793,36 +854,32 @@
                         movable: true,
                         destroys: true,
                         canLink: true
-                    }
+                    },
+                    render: rndr
                 });
             }
             else if (level.map[i] === 2) {
                 tilePool.get({
                     x: tileWidth*(i%level.width),
                     y: tileHeight*Math.floor(i/level.width),
-                    //color: 'midnightblue',
                     image: d.getElementById('img_wall_hard'),
-                    //width: tileWidth,
-                    //height: tileHeight,
                     dx: 0,
                     ttl: Infinity,
                     properties: {
                         index: level.map[i],
                         collides: true,
                         movable: false,
-                        destroys: false,
+                        destroys: true,
                         canLink: true
-                    }
+                    },
+                    render: rndr
                 });
             }
             else if (level.map[i] === 3) {
                 currentLevel.destructables.push(tilePool.get({
                     x: tileWidth*(i%level.width),
                     y: tileHeight*Math.floor(i/level.width),
-                    //color: 'midnightblue',
                     image: d.getElementById('img_destruct'),
-                    //width: tileWidth,
-                    //height: tileHeight,
                     dx: 0,
                     ttl: Infinity,
                     properties: {
@@ -830,18 +887,16 @@
                         collides: false,
                         movable: false,
                         destroys: false,
-                        canLink: true
-                    }
+                        canLink: false
+                    },
+                    render: rndr
                 }));
             }
             else if (level.map[i] === 4) {
-                currentLevel.destructables.push(tilePool.get({
+                tilePool.get({
                     x: tileWidth*(i%level.width),
                     y: tileHeight*Math.floor(i/level.width),
-                    //color: 'midnightblue',
                     image: d.getElementById('img_spike'),
-                    //width: tileWidth,
-                    //height: tileHeight,
                     dx: 0,
                     ttl: Infinity,
                     properties: {
@@ -853,20 +908,164 @@
                     },
                     update: function() {
                         if (player.collidesWith(this) && (player.y > this.y)) {
-                            w.playSfx('death')
+                            w.playSfx('death');
+                            unlinkMarkedSprites();
                             loadLevel(true);
                         }
+                    },
+                    render: rndr
+                });
+            }
+            else if (level.map[i] === 5) {
+                tilePool.get({
+                    x: tileWidth*(i%level.width),
+                    y: tileHeight*Math.floor(i/level.width),
+                    image: d.getElementById('img_keyhole'),
+                    dx: 0,
+                    ttl: Infinity,
+                    properties: {
+                        index: level.map[i],
+                        collides: true,
+                        movable: false,
+                        destroys: false,
+                        canLink: false
+                    },
+                    update: function() {
+                        if (player.collidesWith(this) && player.properties.hasKey) {
+                            if (!this.properties.played) {
+                                w.playSfx('hit');
+                                this.properties.played = true;
+                            }
+                            this.ttl = 0;
+                        }
+                    },
+                    render: rndr
+                });
+            }
+            else if (level.map[i] === 6 && !player.properties.hasKey) {
+                tilePool.get({
+                    x: tileWidth*(i%level.width),
+                    y: tileHeight*Math.floor(i/level.width),
+                    image: d.getElementById('img_key'),
+                    dx: 0,
+                    ttl: Infinity,
+                    properties: {
+                        index: level.map[i],
+                        collides: false,
+                        movable: false,
+                        destroys: false,
+                        canLink: false
+                    },
+                    update: function() {
+                        if (player.collidesWith(this)) {
+                            if (!this.properties.played) {
+                                w.playSfx('powerup');
+                                this.properties.played = true;
+                            }
+                            this.ttl = 0;
+                            player.properties.hasKey = true;
+                        }
+                    },
+                    render: rndr
+                });
+            }
+            else if (level.map[i] === 7) {
+                tilePool.get({
+                    x: tileWidth*(i%level.width),
+                    y: tileHeight*Math.floor(i/level.width),
+                    image: d.getElementById('img_portal'),
+                    dx: 0,
+                    ttl: Infinity,
+                    properties: {
+                        index: level.map[i],
+                        collides: false,
+                        movable: false,
+                        destroys: false,
+                        canLink: false
+                    },
+                    update: function() {
+                        if (player.collidesWith(this)) {
+                            this.ttl = 0;
+                            if (worldCoord.x === 1) {
+                                worldCoord.x = 5;
+                            }
+                            else {
+                                worldCoord.x = 1;
+                            }
+                            if (!this.properties.played) {
+                                w.playSfx('warp');
+                                this.properties.played = true;
+
+                                loadLevelNextUpdate = true;
+                                loadLevelNextUpdatePosition = player;
+                            }
+                        }
+                    },
+                    render: rndr
+                });
+            }
+            else if (level.map[i] === 13) {
+                var btnDown = (worldCoord.x === 2 && worldCoord.y === 2) ? leftButtonDown : rightButtonDown;
+                tilePool.get({
+                    x: tileWidth*(i%level.width),
+                    y: tileHeight*Math.floor(i/level.width),
+                    image: btnDown ? d.getElementById('img_button_down') : d.getElementById('img_button'),
+                    dx: 0,
+                    ttl: Infinity,
+                    properties: {
+                        index: level.map[i],
+                        collides: false,
+                        movable: false,
+                        destroys: false,
+                        canLink: false,
+                        down: btnDown
+                    },
+                    update: function() {
+                        if (player.collidesWith(this)) {
+                            if (!this.properties.down) {
+                                w.playSfx('hit');
+                                this.properties.down = true;
+                                (worldCoord.x === 2 && worldCoord.y === 2) ? (leftButtonDown = true) : (rightButtonDown = true);
+
+                                if (leftButtonDown && rightButtonDown) {
+                                    shake = true;
+                                    setTimeout(function(){
+                                        shake = false;
+                                    }, 3000)
+                                }
+                            }
+                        }
+                    },
+                    render: function(){
+                        if (this.properties.down) {
+                            this.image = d.getElementById('img_button_down')
+                        }
+                        rndr.call(this);
                     }
-                }));
+                });
+            }
+            else if (level.map[i] === 8 && leftButtonDown && rightButtonDown) {
+                tilePool.get({
+                    x: tileWidth*(i%level.width),
+                    y: tileHeight*Math.floor(i/level.width),
+                    image: d.getElementById('img_wall_hard'),
+                    dx: 0,
+                    ttl: Infinity,
+                    properties: {
+                        index: level.map[i],
+                        collides: true,
+                        movable: false,
+                        destroys: false,
+                        canLink: true
+                    },
+                    render: rndr
+                });
             }
             else if (level.map[i] === 9 && !player.properties.canPush) {
                 tilePool.get({
                     x: tileWidth*(i%level.width) - tileWidth/2,
                     y: tileHeight*Math.floor(i/level.width),
-                    //color: 'midnightblue',
                     image: d.getElementById('img_shot2'),
-                    //width: tileWidth,
-                    //height: tileHeight,
                     dx: 0,
                     ttl: Infinity,
                     update: function(){
@@ -881,7 +1080,7 @@
                                 if (kontra.pointer.pressed('left')) {
                                     removeButtonPrompt();
                                 }
-                            })
+                            }, canvas.width/2, canvas.height/2+20);
                         }
                     },
                     properties: {
@@ -890,17 +1089,15 @@
                         movable: false,
                         destroys: false,
                         played: false
-                    }
+                    },
+                    render: rndr
                 });
             }
             else if (level.map[i] === 10 && !player.properties.canLink) {
                 tilePool.get({
                     x: tileWidth*(i%level.width),
                     y: tileHeight*Math.floor(i/level.width),
-                    //color: 'midnightblue',
                     image: d.getElementById('img_shot'),
-                    //width: tileWidth,
-                    //height: tileHeight,
                     dx: 0,
                     ttl: Infinity,
                     update: function(){
@@ -924,17 +1121,15 @@
                         movable: false,
                         destroys: false,
                         played: false
-                    }
+                    },
+                    render: rndr
                 });
             }
             else if (level.map[i] === 11 && !player.properties.canSprint) {
                 tilePool.get({
                     x: tileWidth*(i%level.width) - tileWidth/2,
                     y: tileHeight*Math.floor(i/level.width),
-                    //color: 'midnightblue',
                     image: d.getElementById('img_sprint'),
-                    //width: tileWidth,
-                    //height: tileHeight,
                     dx: 0,
                     ttl: Infinity,
                     update: function(){
@@ -946,10 +1141,10 @@
                             this.ttl = 0;
                             player.properties.canSprint = true;
                             setButtonPrompt('shift', function(){
-                                if (kontra.pointer.pressed('shift')) {
+                                if (kontra.keys.pressed('shift')) {
                                     removeButtonPrompt();
                                 }
-                            })
+                            }, 135, 60)
                         }
                     },
                     properties: {
@@ -958,7 +1153,37 @@
                         movable: false,
                         destroys: false,
                         played: false
-                    }
+                    },
+                    render: rndr
+                });
+            }
+            else if (level.map[i] === 12 && !player.properties.extraTime) {
+                tilePool.get({
+                    x: tileWidth*(i%level.width) - tileWidth/2,
+                    y: tileHeight*Math.floor(i/level.width),
+                    image: d.getElementById('img_clock'),
+                    dx: 0,
+                    ttl: Infinity,
+                    update: function(){
+                        if (player.collidesWith(this)) {
+                            if (!this.properties.played) {
+                                w.playSfx('powerup');
+                                this.properties.played = true;
+                            }
+                            this.ttl = 0;
+                            player.properties.extraTime = true;
+                            gameOverTime += (5 * 60);
+                            gameOverTimer += (5 * 60);
+                        }
+                    },
+                    properties: {
+                        index: level.map[i],
+                        collides: false,
+                        movable: false,
+                        destroys: false,
+                        played: false
+                    },
+                    render: rndr
                 });
             }
         }
@@ -1138,15 +1363,28 @@
      */
     function renderButtonPrompt() {
         if (buttonPrompt) {
-            ctx.drawImage(d.getElementById('img_button_' + buttonPrompt), canvas.width/2, canvas.height/2);
+            firstPassCtx.drawImage(d.getElementById('img_button_' + buttonPrompt), buttonPromptCoords.x, buttonPromptCoords.y);
         }
     }
 
     /**
      * @param button
      * @param update
+     * @param [x]
+     * @param [y]
      */
-    function setButtonPrompt(button, update) {
+    function setButtonPrompt(button, update, x, y) {
+        if (x && y) {
+            buttonPromptCoords = {
+                x: x, y: y
+            }
+        }
+        else {
+            buttonPromptCoords = {
+                x: firstPassCanvas.width/2,
+                y: firstPassCanvas.height/2
+            }
+        }
         buttonPrompt = button;
         buttonPromptUpdate = update;
     }
@@ -1162,19 +1400,35 @@
     /**
      * Flatten the image to 32 colors.
      */
-    function postProcess() {
-        var imgData = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
+    function flattenLines(greenCtx) {
+        // load all pixels into an array
+        var imageData=greenCtx.getImageData(0,0,firstPassCanvas.width,firstPassCanvas.height);
+        var data=imageData.data;
+
+        for(var i=0; i<data.length; i+=4) {
+            if(data[i+3]>0){
+                data[i]   = 0;
+                data[i+1] = 255;
+                data[i+2] = 0;
+                data[i+3] = 255;
+            }
+        }
+        greenCtx.putImageData(imageData, 0, 0);
+    }
+
+    function countColors() {
+        var imgData = firstPassCtx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
         var colors = {};
         var r, g, b, a;
         var key;
 
         for (var i = 0; i < imgData.data.length; i += 4) {
             r = imgData.data[i];
-            g = imgData.data[i+1];
-            b = imgData.data[i+2];
-            key = (r   << 16) |
-                (g << 8) |
-                (b <<  4);
+            g = imgData.data[i + 1];
+            b = imgData.data[i + 2];
+            key = (r << 16) |
+              (g << 8) |
+              (b << 4);
             //console.log(key.toString(16));
             colors[key] = colors[key] || 1;
             colors[key]++;
@@ -1184,6 +1438,17 @@
             console.log(colors);
             alert('TOO MANY COLORS! GOT ' + Object.keys(colors).length);
         }
-        //this.ctx.putImageData(imgData, 0, 0);
     }
+
+    function preShake(ctx) {
+        ctx.save();
+        var dx = Math.round(Math.random());
+        var dy = Math.round(Math.random());
+        ctx.translate(dx, dy);
+    }
+
+    function postShake(ctx) {
+        ctx.restore();
+    }
+
 }());
