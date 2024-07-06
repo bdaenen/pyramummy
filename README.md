@@ -35,9 +35,10 @@ R: Reset current room. Useful when fully locking up rooms
 Limitations
 ----------------
 
-Max 31337 bytes
-360x400 pixels stretched to the whole screen (tested on 1920x1080)
-Max 32 colors per frame
+- Max 31337 bytes
+- 360x400 pixels stretched to the whole screen (tested on 1920x1080)
+- Max 32 colors per frame
+
 Known bugs
 ----------------
 - Collision separation is quite poor:
